@@ -2,5 +2,9 @@
 name = "copper"
 version = "0.1.0"
 edition = "2021"
+authors = ["DuckySmacky"]
 
 [dependencies]
+clap = { version = "4.5.23", features = ["cargo"] }
+serde = { version = "1.0.217", features = ["derive"] }
+toml = "0.8.19"
