@@ -1,2 +1,7 @@
-[general]
-name = "example"
+Name = "example"
+Compiler = "gcc"
+
+[Unit]
+Name = "app"
+Directory = "src/"
+Output = "bin/"
