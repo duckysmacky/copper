@@ -1,64 +1,203 @@
-use std::fs;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::{self, Path, PathBuf};
+use std::ffi::OsString;
+use std::string::String;
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use serde::{Deserialize, Serialize};
+use crate::error::Error;
 
-const COPPER_FILE_NAME: &str = "copper.toml";
+pub const PROJECT_FILE_NAME: &str = "copper.toml";
+#[allow(dead_code)]
+pub const PROJECT_DIRECTORY_NAME: &str = ".copper";
 
-#[derive(Serialize, Deserialize)]
+/// Main Copper project configuration
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct CopperProject {
+pub struct CopperProject {
+    /// Name of the project
     name: String,
-    compiler: String,
-    unit: Option<CopperUnit>
+    /// Chosen language for the project
+    language: Option<CopperProjectLanguage>,
+    /// Chosen compiler for the project
+    compiler: Option<CopperProjectCompiler>,
+    /// Project-wide additional cm
+    compiler_flags: Option<Vec<String>>,
+    /// Project build output directory
+    build_output: PathBuf,
+    /// Unit configuration data
+    #[serde(rename = "Unit")]
+    units: Option<Vec<CopperUnit>>,
+    /// Location of the Copper project relative to where the command was executed.
+    /// Usually kept as "." (for local directory)
+    #[serde(skip)]
+    project_location: PathBuf
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct CopperUnit {
-    name: String,
-    directory: PathBuf,
-    output: Option<PathBuf>
+/// Enum representing available project languages
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(try_from = "String", into = "String")]
+enum CopperProjectLanguage {
+    C,
+    CPP
 }
 
-impl CopperProject {
-    pub fn init(name: String) -> CopperProject {
-        CopperProject {
-            name,
-            compiler: "gcc".to_string(),
-            unit: None,
+impl TryFrom<String> for CopperProjectLanguage {
+    type Error = Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "c" => Ok(CopperProjectLanguage::C),
+            "cpp" => Ok(CopperProjectLanguage::CPP),
+            _ => Err(Error::EnumParseError(format!("Unexpected language value: {}", value)))
         }
     }
+}
 
-    pub fn build(&self, project_directory: &Path) {
-        let unit = self.unit.clone().expect("No unit to build");
-        let unit_dir = project_directory.join(unit.directory);
-        let paths = fs::read_dir(&unit_dir).expect("Unit dir doesn't exist");
+impl Into<String> for CopperProjectLanguage {
+    fn into(self) -> String {
+        match self {
+            CopperProjectLanguage::C => "c".to_string(),
+            CopperProjectLanguage::CPP => "cpp".to_string()
+        }
+    }
+}
+
+impl CopperProjectLanguage {
+    pub fn extensions(&self) -> Vec<OsString> {
+        match self {
+            CopperProjectLanguage::C => vec!["c", "h"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+            CopperProjectLanguage::CPP => vec!["c", "cpp", "h", "hpp"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+        }
+    }
+}
+
+/// Enum representing available project compilers
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(try_from = "String", into = "String")]
+enum CopperProjectCompiler {
+    GCC,
+    GPP,
+    CLANG,
+    MSVC
+}
+
+impl TryFrom<String> for CopperProjectCompiler {
+    type Error = Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "gcc" => Ok(CopperProjectCompiler::GCC),
+            "g++" => Ok(CopperProjectCompiler::GPP),
+            "clang" => Ok(CopperProjectCompiler::CLANG),
+            "msvc" => Ok(CopperProjectCompiler::MSVC),
+            _ => Err(Error::EnumParseError(format!("Unexpected compiler value: {}", value)))
+        }
+    }
+}
+
+impl Into<String> for CopperProjectCompiler {
+    fn into(self) -> String {
+        match self {
+            CopperProjectCompiler::GCC => "gcc".to_string(),
+            CopperProjectCompiler::GPP => "g++".to_string(),
+            CopperProjectCompiler::CLANG => "clang".to_string(),
+            CopperProjectCompiler::MSVC => "msvc".to_string()
+        }
+    }
+}
+
+/// Configuration for the unit
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "PascalCase")]
+struct CopperUnit {
+    /// Name of the unit
+    name: String,
+    /// Type of the unit
+    r#type: UnitType,
+    /// Location of the unit within the project
+    source: PathBuf,
+    /// Per-unit override for the build output
+    build_output: Option<PathBuf>
+}
+
+/// Enum representing available project languages
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(try_from = "String", into = "String")]
+enum UnitType {
+    Binary,
+    StaticLibrary
+}
+
+impl TryFrom<String> for UnitType {
+    type Error = Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "binary" => Ok(UnitType::Binary),
+            "static_library" => Ok(UnitType::StaticLibrary),
+            _ => Err(Error::EnumParseError(format!("Unexpected unit type value: {}", value)))
+        }
+    }
+}
+
+impl Into<String> for UnitType {
+    fn into(self) -> String {
+        match self {
+            UnitType::Binary => "binary".to_string(),
+            UnitType::StaticLibrary => "static_library".to_string()
+        }
+    }
+}
+
+impl CopperUnit {
+    pub fn build(&self, project: &CopperProject) {
+        let unit_path = project.project_location.join(&self.source);
+        let unit_dir = fs::read_dir(&unit_path).expect("Unit location not found");
+
+        let language = project.language.clone().expect("Project language not selected");
 
         let mut source_file_paths: Vec<PathBuf> = Vec::new();
-        for path in paths {
-            let file = path.unwrap().path();
-            if let Some(ext) = file.extension() {
-                if ext.eq("c") {
-                    source_file_paths.push(file);
+        for entry in unit_dir {
+            let file_path = entry.unwrap().path();
+
+            if let Some(ext) = file_path.extension() {
+                if language.extensions().contains(&ext.to_os_string()) {
+                    source_file_paths.push(file_path);
                 }
             }
         }
 
-        let mut output_dir = project_directory.to_path_buf();
-        if let Some(output) = unit.output {
-            output_dir.push(output);
+        let mut output_dir = PathBuf::from(&project.project_location);
+        output_dir.push(match &self.build_output {
+            None => &project.build_output,
+            Some(dir) => dir,
+        });
+        fs::create_dir_all(&output_dir).expect("Unable to create output directory");
+        
+        let mut output_file = output_dir.join(&self.name);
+        match self.r#type {
+            UnitType::Binary => {
+                if cfg!(target_os = "windows") {
+                    output_file.set_extension("exe");
+                }
+            },
+            UnitType::StaticLibrary => {
+                output_file.set_extension("lib");
+            }
         }
-        let output_file = output_dir.join(unit.name);
 
-        eprintln!("Compiling {:?} into {}", source_file_paths, output_file.display());
-        self.compile(source_file_paths, &output_file);
+        println!("Compiling {:?} into {}", source_file_paths, output_file.display());
+        self.compile(project, source_file_paths, &output_file);
     }
 
-    fn compile(&self, sources: Vec<PathBuf>, output: &Path) -> Output {
-        Command::new(&self.compiler)
+    fn compile(&self, project: &CopperProject, sources: Vec<PathBuf>, output: &Path) -> Output {
+        let compiler = project.compiler.clone().expect("Project compiler not selected");
+
+        Command::new::<String>(compiler.into())
             .args(sources)
             .arg("-o")
             .arg(output)
@@ -67,27 +206,43 @@ impl CopperProject {
     }
 }
 
-pub fn init(project_dir: &Path, project_name: String) {
-    let file_path = project_dir.join(COPPER_FILE_NAME);
-    let mut file = File::create_new(file_path).expect("File already exists");
+impl CopperProject {
+    /// Initialises the project with default values where possible
+    pub fn init(name: String, directory: &Path) -> Self {
+        Self {
+            name,
+            language: None,
+            compiler: None,
+            compiler_flags: None,
+            build_output: PathBuf::from("build/"),
+            units: None,
+            project_location: directory.to_path_buf()
+        }
+    }
 
-    let project = CopperProject::init(project_name);
-    let toml_data = toml::to_string(&project).expect("Invalid project file");
+    /// Imports self from a .toml project file
+    pub fn import(directory: &Path) -> Self {
+        let file_path = directory.join(PROJECT_FILE_NAME);
+        let mut file = File::open(file_path).expect("File not found");
 
-    file.write_all(toml_data.as_bytes()).expect("Unable to write to file");
-    file.flush().expect("Unable to close the file");
+        let mut file_data = String::new();
+        file.read_to_string(&mut file_data).expect("Unable to read the file");
+        let mut project: CopperProject = toml::from_str(&file_data).expect("Unable to deserialize");
+        project.project_location = directory.to_path_buf();
+        project
+    }
 
-    println!("Created a new Copper project at {}", path::absolute(project_dir).unwrap().display());
-}
+    /// Builds the project
+    pub fn build(&self) {
+        let units = &self.units;
+        if let None = units {
+            panic!("No units available to build");
+        }
 
-pub fn build(project_dir: &Path) {
-    let file_path = project_dir.join(COPPER_FILE_NAME);
-    let mut file = File::open(file_path).expect("File not found");
+        for unit in units.clone().unwrap() {
+            unit.build(self);
+        }
 
-    let mut file_data = String::new();
-    file.read_to_string(&mut file_data).expect("Unable to read the file");
-    let project: CopperProject = toml::from_str(&file_data).expect("Unable to deserialize");
-
-    project.build(project_dir);
-    println!("Successfully built \"{}\"", &project.name);
+        println!("Successfully built \"{}\"", &self.name);
+    }
 }

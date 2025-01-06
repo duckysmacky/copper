@@ -1,7 +1,9 @@
 Name = "example"
+Language = "c"
 Compiler = "gcc"
+BuildOutput = "build/"
 
-[Unit]
+[[Unit]]
 Name = "app"
-Directory = "src/"
-Output = "bin/"
+Type = "binary"
+Source = "src/"

@@ -1,7 +1,7 @@
 use std::env;
 use std::path::Path;
 use clap::ArgMatches;
-use crate::project;
+use crate::jobs;
 
 pub fn handle_init(matches: &ArgMatches) {
     let project_dir = Path::new(matches.get_one::<String>("directory").unwrap());
@@ -21,11 +21,11 @@ pub fn handle_init(matches: &ArgMatches) {
         }
     };
 
-    project::init(project_dir, project_name);
+    jobs::init(project_dir, project_name);
 }
 
 pub fn handle_build(matches: &ArgMatches) {
     let project_dir = Path::new(matches.get_one::<String>("directory").unwrap());
 
-    project::build(project_dir);
+    jobs::build(project_dir);
 }

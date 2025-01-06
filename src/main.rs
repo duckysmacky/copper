@@ -1,6 +1,9 @@
 mod commands;
 mod project;
 mod file;
+mod compiler;
+mod error;
+mod jobs;
 
 use clap::{command, Arg, Command};
 
