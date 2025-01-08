@@ -1,9 +1,10 @@
-Name = "example"
-Language = "c"
-Compiler = "gcc"
-BuildOutput = "build/"
+name = "example"
+language = "c"
+compiler = "gcc"
 
 [[Unit]]
-Name = "app"
-Type = "binary"
-Source = "src/"
+name = "app"
+type = "binary"
+source = "src/"
+output_directory = "build/bin/"
+intermediate_directory = "build/temp/"

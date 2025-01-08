@@ -3,8 +3,8 @@ use std::string::String;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
 use serde::{Deserialize, Serialize};
+use crate::compiler::{self, CompileOptions, Compiler};
 use crate::error::Error;
 
 pub const PROJECT_FILE_NAME: &str = "copper.toml";
@@ -13,7 +13,6 @@ pub const PROJECT_DIRECTORY_NAME: &str = ".copper";
 
 /// Main Copper project configuration
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
 pub struct CopperProject {
     /// Name of the project
     name: String,
@@ -21,10 +20,6 @@ pub struct CopperProject {
     language: Option<CopperProjectLanguage>,
     /// Chosen compiler for the project
     compiler: Option<CopperProjectCompiler>,
-    /// Project-wide additional cm
-    compiler_flags: Option<Vec<String>>,
-    /// Project build output directory
-    build_output: PathBuf,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Option<Vec<CopperUnit>>,
@@ -63,7 +58,7 @@ impl Into<String> for CopperProjectLanguage {
 }
 
 impl CopperProjectLanguage {
-    pub fn extensions(&self) -> Vec<OsString> {
+    pub fn all_extensions(&self) -> Vec<OsString> {
         match self {
             CopperProjectLanguage::C => vec!["c", "h"]
                 .into_iter()
@@ -75,12 +70,38 @@ impl CopperProjectLanguage {
                 .collect(),
         }
     }
+    
+    pub fn source_extensions(&self) -> Vec<OsString> {
+        match self {
+            CopperProjectLanguage::C => vec!["c"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+            CopperProjectLanguage::CPP => vec!["c", "cpp"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+        }
+    }
+    
+    pub fn header_extensions(&self) -> Vec<OsString> {
+        match self {
+            CopperProjectLanguage::C => vec!["h"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+            CopperProjectLanguage::CPP => vec!["h", "hpp"]
+                .into_iter()
+                .map(OsString::from)
+                .collect(),
+        }
+    }
 }
 
 /// Enum representing available project compilers
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(try_from = "String", into = "String")]
-enum CopperProjectCompiler {
+pub enum CopperProjectCompiler {
     GCC,
     GPP,
     CLANG,
@@ -113,22 +134,23 @@ impl Into<String> for CopperProjectCompiler {
 
 /// Configuration for the unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "PascalCase")]
-struct CopperUnit {
+pub struct CopperUnit {
     /// Name of the unit
     name: String,
     /// Type of the unit
     r#type: UnitType,
     /// Location of the unit within the project
     source: PathBuf,
-    /// Per-unit override for the build output
-    build_output: Option<PathBuf>
+    /// Per-unit build output location
+    output_directory: PathBuf,
+    /// Per-unit location for intermediate files
+    intermediate_directory: PathBuf,
 }
 
 /// Enum representing available project languages
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(try_from = "String", into = "String")]
-enum UnitType {
+pub enum UnitType {
     Binary,
     StaticLibrary
 }
@@ -165,17 +187,14 @@ impl CopperUnit {
             let file_path = entry.unwrap().path();
 
             if let Some(ext) = file_path.extension() {
-                if language.extensions().contains(&ext.to_os_string()) {
+                if language.source_extensions().contains(&ext.to_os_string()) {
                     source_file_paths.push(file_path);
                 }
             }
         }
 
         let mut output_dir = PathBuf::from(&project.project_location);
-        output_dir.push(match &self.build_output {
-            None => &project.build_output,
-            Some(dir) => dir,
-        });
+        output_dir.push(&self.output_directory);
         fs::create_dir_all(&output_dir).expect("Unable to create output directory");
         
         let mut output_file = output_dir.join(&self.name);
@@ -190,19 +209,17 @@ impl CopperUnit {
             }
         }
 
-        println!("Compiling {:?} into {}", source_file_paths, output_file.display());
-        self.compile(project, source_file_paths, &output_file);
-    }
-
-    fn compile(&self, project: &CopperProject, sources: Vec<PathBuf>, output: &Path) -> Output {
-        let compiler = project.compiler.clone().expect("Project compiler not selected");
-
-        Command::new::<String>(compiler.into())
-            .args(sources)
-            .arg("-o")
-            .arg(output)
-            .output()
-            .expect("Unable to compile")
+        let project_compiler = project.compiler.clone().expect("Project compiler not selected");
+        let compile_options = CompileOptions::new(
+            self.name.clone(),
+            self.r#type.clone(),
+            source_file_paths,
+            project.project_location.join(&self.output_directory),
+            project.project_location.join(&self.intermediate_directory),
+        );
+        let compiler = compiler::get_compiler(project_compiler, compile_options);
+        compiler.compile().unwrap();
+        compiler.link().unwrap();
     }
 }
 
@@ -213,14 +230,12 @@ impl CopperProject {
             name,
             language: None,
             compiler: None,
-            compiler_flags: None,
-            build_output: PathBuf::from("build/"),
             units: None,
             project_location: directory.to_path_buf()
         }
     }
 
-    /// Imports self from a .toml project file
+    /// Imports a Copper project from a .toml project file
     pub fn import(directory: &Path) -> Self {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::open(file_path).expect("File not found");
@@ -232,7 +247,7 @@ impl CopperProject {
         project
     }
 
-    /// Builds the project
+    /// Builds the whole project
     pub fn build(&self) {
         let units = &self.units;
         if let None = units {
@@ -242,7 +257,10 @@ impl CopperProject {
         for unit in units.clone().unwrap() {
             unit.build(self);
         }
+    }
 
-        println!("Successfully built \"{}\"", &self.name);
+    /// Builds specified unit
+    pub fn build_unit(&self, unit_name: &str) {
+        todo!();
     }
 }
