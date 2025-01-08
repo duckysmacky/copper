@@ -2,16 +2,25 @@
 use std::fmt::{Display, Formatter};
 use std::process::Output;
 
+/// Type alias for the custom error type
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Custom error type
 #[derive(Debug)]
 pub enum Error {
+    /// Error related to writing and reading files and directories 
     IOError(String),
+    /// Error related to the language compiler and its process
     CompilerError(String),
+    /// Error related to the compilation of the source files
     CompileError(Output),
+    /// Error related to the linking of the object files
     LinkError(Output),
+    /// Error related to general build errors
     BuildError(Output),
+    /// Error related to being unable to parse enum values
     EnumParseError(String),
+    /// Error related to come crucial configuration missing
     MissingConfigError(String),
 }
 

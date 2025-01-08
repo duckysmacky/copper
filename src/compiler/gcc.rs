@@ -43,6 +43,7 @@ impl From<CompileOptions> for GCCCompiler {
 }
 
 impl Compiler for GCCCompiler {
+    /// Build implementation for GCC
     fn build(&self) {
         if let Err(err) = self.compile() {
             eprintln!("{}", err);
@@ -57,6 +58,7 @@ impl Compiler for GCCCompiler {
 }
 
 impl GCCCompiler {
+    /// Compiles source files into object files
     fn compile(&self) -> Result<()> {
         for source_file in &self.target_source_files {
             let mut output_file = self.target_intermediate_directory.join(source_file.file_name().unwrap());
@@ -71,6 +73,7 @@ impl GCCCompiler {
         Ok(())
     }
 
+    /// Links compiled object files to the output file
     fn link(&self) -> Result<()> {
         let mut object_files = self.target_source_files.iter()
             .map(|source_file| self.target_intermediate_directory.join(source_file.file_name().unwrap()))

@@ -88,19 +88,17 @@ impl CompilerCommand {
 
 /// Executor for the compiler command itself
 struct CompilerCommandExecutor<'a> {
-    executable: &'a str,
-    option_flags: &'a CompilerCommandFlags,
     command: Command,
+    option_flags: &'a CompilerCommandFlags,
 }
 
 impl<'a> CompilerCommandExecutor<'a> {
-    pub fn new(executable_name: &'a str, options_flags: &'a CompilerCommandFlags) -> Self {
+    pub fn new(executable_name: &str, options_flags: &'a CompilerCommandFlags) -> Self {
         let command = Command::new(executable_name);
 
         CompilerCommandExecutor {
-            executable: executable_name,
-            option_flags: options_flags,
             command,
+            option_flags: options_flags,
         }
     }
 
@@ -157,6 +155,7 @@ impl<'a> CompilerCommandExecutor<'a> {
         Ok(output)
     }
 
+    /// Parses the output from the compiler and returns a string containing exit code, stdout and stderr
     fn handle_compiler_output(&self, output: Output) -> String {
         let mut message = String::new();
         message.push_str(format!("Compiler exited with code {}", output.status).as_str());
