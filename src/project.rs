@@ -218,8 +218,7 @@ impl CopperUnit {
             project.project_location.join(&self.intermediate_directory),
         );
         let compiler = compiler::get_compiler(project_compiler, compile_options);
-        compiler.compile().unwrap();
-        compiler.link().unwrap();
+        compiler.build();
     }
 }
 
