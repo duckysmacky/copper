@@ -1,11 +1,19 @@
 use std::ffi::OsString;
+use std::fmt::Display;
 use std::string::String;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{Read, Write};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use crate::compiler::{self, CompileOptions, Compiler};
 use crate::error::Error;
+
+mod default {
+    use std::path::PathBuf;
+
+    pub const BUILD_DIRECTORY: fn() -> PathBuf = || PathBuf::from("build/");
+}
 
 pub const PROJECT_FILE_NAME: &str = "copper.toml";
 #[allow(dead_code)]
@@ -22,9 +30,12 @@ pub struct CopperProject {
     compiler: Option<CopperProjectCompiler>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
-    units: Option<Vec<CopperUnit>>,
+    units: Vec<CopperUnit>,
+    /// Default build directory for all new units
+    #[serde(default = "default::BUILD_DIRECTORY")]
+    #[serde(skip_serializing)]
+    default_build_directory: PathBuf,
     /// Location of the Copper project relative to where the command was executed.
-    /// Usually kept as "." (for local directory)
     #[serde(skip)]
     project_location: PathBuf
 }
@@ -155,12 +166,24 @@ pub enum UnitType {
     StaticLibrary
 }
 
+impl UnitType {
+    const BINARY_STR: &'static str = "binary";
+    const STATIC_LIBRARY_STR: &'static str = "static-library";
+
+    pub fn get_strings() -> [&'static str; 2] {
+        [
+            Self::BINARY_STR,
+            Self::STATIC_LIBRARY_STR
+        ]
+    }
+}
+
 impl TryFrom<String> for UnitType {
     type Error = Error;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
-            "binary" => Ok(UnitType::Binary),
-            "static_library" => Ok(UnitType::StaticLibrary),
+            UnitType::BINARY_STR => Ok(UnitType::Binary),
+            UnitType::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),
             _ => Err(Error::EnumParseError(format!("Unexpected unit type value: {}", value)))
         }
     }
@@ -169,13 +192,39 @@ impl TryFrom<String> for UnitType {
 impl Into<String> for UnitType {
     fn into(self) -> String {
         match self {
-            UnitType::Binary => "binary".to_string(),
-            UnitType::StaticLibrary => "static_library".to_string()
+            UnitType::Binary => UnitType::BINARY_STR.to_string(),
+            UnitType::StaticLibrary => UnitType::STATIC_LIBRARY_STR.to_string()
         }
     }
 }
 
+impl Display for UnitType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            UnitType::Binary => UnitType::BINARY_STR.to_string(),
+            UnitType::StaticLibrary => UnitType::STATIC_LIBRARY_STR.to_string()
+        };
+        write!(f, "{}", str)
+    }
+}
+
 impl CopperUnit {
+    pub fn new(
+        name: String,
+        r#type: UnitType,
+        source: PathBuf,
+        output_directory: PathBuf,
+        intermediate_directory: PathBuf
+    ) -> Self {
+        CopperUnit {
+            name,
+            r#type,
+            source,
+            output_directory,
+            intermediate_directory
+        }
+    }
+
     pub fn build(&self, project: &CopperProject) {
         let unit_path = project.project_location.join(&self.source);
         let unit_dir = fs::read_dir(&unit_path).expect("Unit location not found");
@@ -229,7 +278,8 @@ impl CopperProject {
             name,
             language: None,
             compiler: None,
-            units: None,
+            units: Vec::new(),
+            default_build_directory: default::BUILD_DIRECTORY(),
             project_location: directory.to_path_buf()
         }
     }
@@ -246,14 +296,36 @@ impl CopperProject {
         project
     }
 
+    pub fn save(self, directory: &Path) {
+        let file_path = directory.join(PROJECT_FILE_NAME);
+        let mut file = File::create(&file_path).expect("Unable to open file");
+
+        let toml_data = toml::to_string(&self).expect("Invalid project file");
+
+        file.write_all(toml_data.as_bytes()).expect("Unable to write to file");
+        file.flush().expect("Unable to close the file");
+    }
+
+    pub fn add_unit(&mut self, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
+        let unit_type_directory = match &unit_type {
+            UnitType::Binary => "bin/",
+            UnitType::StaticLibrary => "lib/"
+        };
+
+        self.units.push(CopperUnit::new(
+            unit_name,
+            unit_type,
+            unit_source,
+            self.default_build_directory.join(unit_type_directory),
+            self.default_build_directory.join("obj/")
+        ))
+    }
+
     /// Builds the whole project
     pub fn build(&self) {
         let units = &self.units;
-        if let None = units {
-            panic!("No units available to build");
-        }
 
-        for unit in units.clone().unwrap() {
+        for unit in units {
             unit.build(self);
         }
     }
