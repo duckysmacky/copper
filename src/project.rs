@@ -6,12 +6,13 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use crate::compiler::{self, CompileOptions, Compiler};
-use crate::error::Error;
+use crate::error::{Result, Error};
 
 mod default {
     use std::path::PathBuf;
+    type Val<T> = fn() -> T;
 
-    pub const BUILD_DIRECTORY: fn() -> PathBuf = || PathBuf::from("build/");
+    pub const BUILD_DIRECTORY: Val<PathBuf> = || PathBuf::from("build/");
 }
 
 pub const PROJECT_FILE_NAME: &str = "copper.toml";
@@ -24,9 +25,9 @@ pub struct CopperProject {
     /// Name of the project
     name: String,
     /// Chosen language for the project
-    language: Option<CopperProjectLanguage>,
+    language: CopperProjectLanguage,
     /// Chosen compiler for the project
-    compiler: Option<CopperProjectCompiler>,
+    compiler: CopperProjectCompiler,
     /// Additional include paths for the whole project
     include_paths: Option<Vec<PathBuf>>,
     /// Unit configuration data
@@ -42,40 +43,70 @@ pub struct CopperProject {
 }
 
 impl CopperProject {
-    /// Initialises the project with default values where possible
-    pub fn init(name: String, directory: &Path) -> Self {
-        Self {
-            name,
-            language: None,
-            compiler: None,
+    /// Initialises the project with default values where possible and generates a new .toml file
+    pub fn init(project_location: &Path, project_name: String, project_language: CopperProjectLanguage) -> Result<PathBuf> {
+        let default_compiler = if cfg!(target_os = "windows") {
+            CopperProjectCompiler::MSVC
+        } else {
+            match &project_language {
+                CopperProjectLanguage::C => CopperProjectCompiler::GCC,
+                CopperProjectLanguage::CPP => CopperProjectCompiler::GPP
+            }
+        };
+
+        let example_unit = CopperUnit::new(
+            "example".to_string(),
+            UnitType::Binary,
+            PathBuf::from("src/"),
+            PathBuf::from("build/bin"),
+            PathBuf::from("build/obj")
+        );
+
+        let project = Self {
+            name: project_name,
+            language: project_language,
+            compiler: default_compiler,
             include_paths: None,
-            units: Vec::new(),
+            units: vec![example_unit],
             default_build_directory: default::BUILD_DIRECTORY(),
-            project_location: directory.to_path_buf()
-        }
+            project_location: project_location.to_path_buf()
+        };
+
+        let file_path = project_location.join(PROJECT_FILE_NAME);
+        let mut file = File::create_new(&file_path)?;
+
+        let toml_data = toml::to_string(&project)
+            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
+
+        file.write_all(toml_data.as_bytes())?;
+        file.flush()?;
+        Ok(file_path)
     }
 
     /// Imports a Copper project from a .toml project file
-    pub fn import(directory: &Path) -> Self {
+    pub fn import(directory: &Path) -> Result<Self> {
         let file_path = directory.join(PROJECT_FILE_NAME);
-        let mut file = File::open(file_path).expect("File not found");
+        let mut file = File::open(file_path)?;
 
         let mut file_data = String::new();
-        file.read_to_string(&mut file_data).expect("Unable to read the file");
-        let mut project: CopperProject = toml::from_str(&file_data).expect("Unable to deserialize");
+        file.read_to_string(&mut file_data)?;
+        let mut project: CopperProject = toml::from_str(&file_data)
+            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
         project.project_location = directory.to_path_buf();
-        project
+        Ok(project)
     }
 
     /// Saves current Copper project to the .toml project file
-    pub fn save(self, directory: &Path) {
+    pub fn save(self, directory: &Path) -> Result<()> {
         let file_path = directory.join(PROJECT_FILE_NAME);
-        let mut file = File::create(&file_path).expect("Unable to open file");
+        let mut file = File::create(&file_path)?;
 
-        let toml_data = toml::to_string(&self).expect("Invalid project file");
+        let toml_data = toml::to_string(&self)
+            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
 
-        file.write_all(toml_data.as_bytes()).expect("Unable to write to file");
-        file.flush().expect("Unable to close the file");
+        file.write_all(toml_data.as_bytes())?;
+        file.flush()?;
+        Ok(())
     }
 
     /// Creates a new unit with minimum configuration and adds it to the project
@@ -95,12 +126,14 @@ impl CopperProject {
     }
 
     /// Builds the whole project
-    pub fn build(&self) {
+    pub fn build(&self) -> Result<()> {
         let units = &self.units;
 
         for unit in units {
-            unit.build(self);
+            unit.build(self)?;
         }
+
+        Ok(())
     }
 }
 
@@ -138,18 +171,16 @@ impl CopperUnit {
 
     /// Collects needed information about the unit and builds it according to its type and selected
     /// project compiler
-    pub fn build(&self, project: &CopperProject) {
+    pub fn build(&self, project: &CopperProject) -> Result<()> {
         let unit_path = project.project_location.join(&self.source);
-        let unit_dir = fs::read_dir(&unit_path).expect("Unit location not found");
-
-        let language = project.language.clone().expect("Project language not selected");
+        let unit_dir = fs::read_dir(&unit_path)?;
 
         let mut source_file_paths: Vec<PathBuf> = Vec::new();
         for entry in unit_dir {
-            let file_path = entry.unwrap().path();
+            let file_path = entry?.path();
 
             if let Some(ext) = file_path.extension() {
-                if language.extensions().contains(&ext.to_os_string()) {
+                if project.language.extensions().contains(&ext.to_os_string()) {
                     source_file_paths.push(file_path);
                 }
             }
@@ -157,7 +188,7 @@ impl CopperUnit {
 
         let mut output_dir = PathBuf::from(&project.project_location);
         output_dir.push(&self.output_directory);
-        fs::create_dir_all(&output_dir).expect("Unable to create output directory");
+        fs::create_dir_all(&output_dir)?;
 
         let mut output_file = output_dir.join(&self.name);
         match self.r#type {
@@ -166,13 +197,9 @@ impl CopperUnit {
                     output_file.set_extension("exe");
                 }
             },
-            UnitType::StaticLibrary => {
-                output_file.set_extension("lib");
-            }
+            UnitType::StaticLibrary => todo!()
         }
 
-        let project_compiler = project.compiler.clone().expect("Project compiler not selected");
-        let project_language = project.language.clone().expect("Project language not specified");
         let include_paths = if let Some(paths) = &project.include_paths {
                 let paths = paths.iter()
                     .map(|path| project.project_location.join(path))
@@ -182,14 +209,16 @@ impl CopperUnit {
         let compile_options = CompileOptions::new(
             self.name.clone(),
             self.r#type.clone(),
-            project_language,
+            project.language.clone(),
             source_file_paths,
             project.project_location.join(&self.output_directory),
             project.project_location.join(&self.intermediate_directory),
             include_paths
         );
-        let compiler = compiler::get_compiler(project_compiler, compile_options);
+        let compiler = compiler::get_compiler(&project.compiler, compile_options);
         compiler.build();
+
+        Ok(())
     }
 }
 
@@ -207,6 +236,14 @@ impl CopperProjectLanguage {
     const C_EXTENSIONS: [&'static str; 1] = ["c"];
     const CPP_EXTENSIONS: [&'static str; 2] = ["c", "cpp"];
 
+    /// Returns an array of possible unit type variants as stings
+    pub fn get_strings() -> [&'static str; 2] {
+        [
+            Self::C_STR,
+            Self::CPP_STR
+        ]
+    }
+
     /// Returns a vector containing possible source file extensions for the specific language
     pub fn extensions(&self) -> Vec<OsString> {
         match self {
@@ -220,8 +257,8 @@ impl CopperProjectLanguage {
 
 impl TryFrom<String> for CopperProjectLanguage {
     type Error = Error;
-    
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             Self::C_STR => Ok(CopperProjectLanguage::C),
             Self::CPP_STR => Ok(CopperProjectLanguage::CPP),
@@ -262,7 +299,7 @@ pub enum CopperProjectCompiler {
 impl TryFrom<String> for CopperProjectCompiler {
     type Error = Error;
     
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "gcc" => Ok(CopperProjectCompiler::GCC),
             "g++" => Ok(CopperProjectCompiler::GPP),
@@ -318,7 +355,7 @@ impl Display for UnitType {
 impl TryFrom<String> for UnitType {
     type Error = Error;
     
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             UnitType::BINARY_STR => Ok(UnitType::Binary),
             UnitType::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),

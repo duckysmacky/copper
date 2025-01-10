@@ -4,6 +4,12 @@ use clap::ArgMatches;
 use crate::{jobs, project};
 
 pub fn handle_init(matches: &ArgMatches) {
+    let project_language = {
+        let language_str = matches.get_one::<String>("language").unwrap();
+        // Safe to unwrap as we already checked for valid enum strings
+        project::CopperProjectLanguage::try_from(language_str.to_string()).unwrap()
+    };
+    
     let project_location = {
         let location = matches.get_one::<String>("location").unwrap();
         Path::new(location)
@@ -24,7 +30,7 @@ pub fn handle_init(matches: &ArgMatches) {
         }
     };
 
-    jobs::init(project_location, project_name);
+    jobs::init(project_location, project_name, project_language);
 }
 
 pub fn handle_build(matches: &ArgMatches) {
@@ -45,8 +51,9 @@ pub fn handle_unit(matches: &ArgMatches) {
     let unit_path = PathBuf::from(unit_source);
     let unit_name = Path::new(unit_source).file_name().unwrap().to_str().unwrap();
     let unit_type = {
-        let type_name = matches.get_one::<String>("type").unwrap();
-        project::UnitType::try_from(type_name.to_string()).unwrap()
+        let type_str = matches.get_one::<String>("type").unwrap();
+        // Safe to unwrap as we already checked for valid enum strings
+        project::UnitType::try_from(type_str.to_string()).unwrap()
     };
 
     jobs::add_unit(project_location, unit_name, unit_type.clone(), unit_path);

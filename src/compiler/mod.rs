@@ -46,7 +46,7 @@ impl CompileOptions {
 }
 
 /// Returns a specific Compiler based on the chosen project compiler
-pub fn get_compiler(compiler: CopperProjectCompiler, options: CompileOptions) -> impl Compiler {
+pub fn get_compiler(compiler: &CopperProjectCompiler, options: CompileOptions) -> impl Compiler {
     match compiler {
         CopperProjectCompiler::GCC => gcc::GCCCompiler::from(options),
         _ => unimplemented!()
@@ -179,28 +179,8 @@ impl<'a> CompilerCommandExecutor<'a> {
     /// Consumes itself and spawns the process, waits for its completion and returns the output
     pub fn execute(mut self) -> Result<Output> {
         let output = self.command.output()
-            .map_err(|err| Error::CompilerError(format!("Unable to spawn compiler process: {}", err)))?;
-
-        if !output.status.success() {
-            return Err(Error::CompilerError(self.handle_compiler_output(output)));
-        }
+            .map_err(|err| Error::CompilerError(format!("Unable to spawn compiler process ({})", err)))?;
 
         Ok(output)
-    }
-
-    /// Parses the output from the compiler and returns a string containing exit code, stdout and stderr
-    fn handle_compiler_output(&self, output: Output) -> String {
-        let mut message = String::new();
-        message.push_str(format!("Compiler exited with code {}", output.status).as_str());
-
-        if output.stdout.len() > 0 {
-            message.push_str(format!("\nStdout:\n{}", String::from_utf8_lossy(&output.stdout)).as_str());
-        }
-
-        if output.stderr.len() > 0 {
-            message.push_str(format!("\nStderr:\n{}", String::from_utf8_lossy(&output.stderr)).as_str());
-        }
-
-        message
     }
 }

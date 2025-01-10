@@ -1,32 +1,64 @@
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::io::Write;
-use crate::project::{CopperProject, UnitType, PROJECT_FILE_NAME};
+use std::fs;
+use std::process::exit;
+use crate::project::{CopperProject, CopperProjectLanguage, UnitType};
 
-pub fn init(project_dir: &Path, project_name: String) {
-    let file_path = project_dir.join(PROJECT_FILE_NAME);
-    let mut file = File::create_new(&file_path).expect("File already exists");
+pub fn init(project_location: &Path, project_name: String, project_language: CopperProjectLanguage) {
+    let project = CopperProject::init(project_location, project_name, project_language);
 
-    let project = CopperProject::init(project_name, project_dir);
-    let toml_data = toml::to_string(&project).expect("Invalid project file");
+    match project {
+        Ok(path) => {
+            println!("Created a new Copper project at {}", fs::canonicalize(path).unwrap().display());
+        }
+        Err(err) => {
+            println!("Failed to initiate a new Copper project");
+            eprintln!("{}", err);
+            exit(1);
+        }
+    }
 
-    file.write_all(toml_data.as_bytes()).expect("Unable to write to file");
-    file.flush().expect("Unable to close the file");
-
-    println!("Created a new Copper project at {}", fs::canonicalize(file_path).unwrap().display());
 }
 
 pub fn build(project_location: &Path) {
     let project = CopperProject::import(project_location);
-    
-    project.build();
+
+    match project {
+        Ok(project) => {
+            if let Err(err) = project.build() {
+                println!("Unable to build project");
+                eprintln!("{}", err);
+                exit(1);
+            }
+        }
+        Err(err) => {
+            println!("Unable to import project");
+            eprintln!("{}", err);
+            exit(1);
+        }
+    }
+
     println!("Copper project build finished");
 }
 
 pub fn add_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
-    let mut project = CopperProject::import(project_location);
+    let project = CopperProject::import(project_location);
 
-    project.add_unit(unit_name.to_string(), unit_type.clone(), unit_source);
-    project.save(project_location);
+    match project {
+        Ok(mut project) => {
+            project.add_unit(unit_name.to_string(), unit_type.clone(), unit_source);
+
+            if let Err(err) = project.save(project_location) {
+                println!("Unable to save project file");
+                eprintln!("{}", err);
+                exit(1);
+            }
+        },
+        Err(err) => {
+            println!("Unable to import project file");
+            eprintln!("{}", err);
+            exit(1);
+        }
+    }
+
     println!("Successfully added unit \"{}\"", unit_name);
 }

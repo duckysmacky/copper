@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::project::{CopperProjectLanguage, UnitType};
 
 /// GCC-specific string constants
@@ -76,7 +76,11 @@ impl GCCCompiler {
             let mut command = self.command.executor();
             command.output(&output_file)?;
             command.compile(source_file, Some(&self.target_language.to_string()), &self.target_include_paths)?;
-            command.execute()?;
+            let output = command.execute()?;
+
+            if !output.status.success() {
+                return Err(Error::CompileError(output));
+            }
         }
 
         Ok(())
@@ -93,7 +97,11 @@ impl GCCCompiler {
         let mut command = self.command.executor();
         command.output(&output_file)?;
         command.link(&object_files)?;
-        command.execute()?;
+        let output = command.execute()?;
+
+        if !output.status.success() {
+            return Err(Error::LinkError(output));
+        }
         
         Ok(())
     }

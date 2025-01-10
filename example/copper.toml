@@ -7,5 +7,5 @@ include_paths = ["src/include/"]
 name = "app"
 type = "binary"
 source = "src/app"
-output_directory = "build/bin/"
-intermediate_directory = "build/obj/"
+output_directory = "build/bin"
+intermediate_directory = "build/obj"
