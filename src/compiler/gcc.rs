@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags};
 use crate::error::Result;
-use crate::project::UnitType;
+use crate::project::{CopperProjectLanguage, UnitType};
 
 /// GCC-specific string constants
 mod constants {
@@ -10,6 +10,8 @@ mod constants {
     pub mod flags {
         pub const OUTPUT: &str = "-o";
         pub const COMPILE: &str = "-c";
+        pub const DIRECTORY: &str = "-I";
+        pub const LANGUAGE: &str = "-x";
     }
 }
 
@@ -17,10 +19,13 @@ mod constants {
 pub struct GCCCompiler {
     command: CompilerCommand,
     target_name: String,
+    #[allow(dead_code)]
     target_type: UnitType,
+    target_language: CopperProjectLanguage,
     target_source_files: Vec<PathBuf>,
     target_build_directory: PathBuf,
     target_intermediate_directory: PathBuf,
+    target_include_paths: Option<Vec<PathBuf>>
 }
 
 impl From<CompileOptions> for GCCCompiler {
@@ -28,16 +33,20 @@ impl From<CompileOptions> for GCCCompiler {
     fn from(options: CompileOptions) -> Self {
         let compiler_flags = CompilerCommandFlags::new(
             constants::flags::OUTPUT,
-            constants::flags::COMPILE
+            constants::flags::COMPILE,
+            constants::flags::DIRECTORY,
+            constants::flags::LANGUAGE
         );
 
         GCCCompiler {
             command: CompilerCommand::new(constants::COMPILER_EXECUTABLE_NAME, compiler_flags),
             target_name: options.target_name,
             target_type: options.target_type,
+            target_language: options.target_language,
             target_source_files: options.target_source_files,
             target_build_directory: options.target_output_directory,
-            target_intermediate_directory: options.target_intermediate_directory
+            target_intermediate_directory: options.target_intermediate_directory,
+            target_include_paths: options.target_include_paths
         }
     }
 }
@@ -66,7 +75,7 @@ impl GCCCompiler {
 
             let mut command = self.command.executor();
             command.output(&output_file)?;
-            command.compile(source_file)?;
+            command.compile(source_file, Some(&self.target_language.to_string()), &self.target_include_paths)?;
             command.execute()?;
         }
 

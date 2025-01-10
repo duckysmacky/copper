@@ -1,4 +1,4 @@
-#include "./greeter.h"
+#include "greeter.h"
 
 #include <stdio.h>
 

@@ -27,6 +27,8 @@ pub struct CopperProject {
     language: Option<CopperProjectLanguage>,
     /// Chosen compiler for the project
     compiler: Option<CopperProjectCompiler>,
+    /// Additional include paths for the whole project
+    include_paths: Option<Vec<PathBuf>>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
@@ -46,6 +48,7 @@ impl CopperProject {
             name,
             language: None,
             compiler: None,
+            include_paths: None,
             units: Vec::new(),
             default_build_directory: default::BUILD_DIRECTORY(),
             project_location: directory.to_path_buf()
@@ -169,12 +172,21 @@ impl CopperUnit {
         }
 
         let project_compiler = project.compiler.clone().expect("Project compiler not selected");
+        let project_language = project.language.clone().expect("Project language not specified");
+        let include_paths = if let Some(paths) = &project.include_paths {
+                let paths = paths.iter()
+                    .map(|path| project.project_location.join(path))
+                    .collect();
+                Some(paths)
+            } else { None };
         let compile_options = CompileOptions::new(
             self.name.clone(),
             self.r#type.clone(),
+            project_language,
             source_file_paths,
             project.project_location.join(&self.output_directory),
             project.project_location.join(&self.intermediate_directory),
+            include_paths
         );
         let compiler = compiler::get_compiler(project_compiler, compile_options);
         compiler.build();
@@ -184,12 +196,14 @@ impl CopperUnit {
 /// Enum representing available project languages
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(try_from = "String", into = "String")]
-enum CopperProjectLanguage {
+pub enum CopperProjectLanguage {
     C,
     CPP
 }
 
 impl CopperProjectLanguage {
+    const C_STR: &'static str = "c";
+    const CPP_STR: &'static str = "c++";
     const C_EXTENSIONS: [&'static str; 1] = ["c"];
     const CPP_EXTENSIONS: [&'static str; 2] = ["c", "cpp"];
 
@@ -209,8 +223,8 @@ impl TryFrom<String> for CopperProjectLanguage {
     
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
-            "c" => Ok(CopperProjectLanguage::C),
-            "cpp" => Ok(CopperProjectLanguage::CPP),
+            Self::C_STR => Ok(CopperProjectLanguage::C),
+            Self::CPP_STR => Ok(CopperProjectLanguage::CPP),
             _ => Err(Error::EnumParseError(format!("Unexpected language value: {}", value)))
         }
     }
@@ -219,9 +233,19 @@ impl TryFrom<String> for CopperProjectLanguage {
 impl Into<String> for CopperProjectLanguage {
     fn into(self) -> String {
         match self {
-            CopperProjectLanguage::C => "c".to_string(),
-            CopperProjectLanguage::CPP => "cpp".to_string()
+            CopperProjectLanguage::C => Self::C_STR.to_string(),
+            CopperProjectLanguage::CPP => Self::CPP_STR.to_string()
         }
+    }
+}
+
+impl Display for CopperProjectLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            CopperProjectLanguage::C => Self::C_STR.to_string(),
+            CopperProjectLanguage::CPP => Self::CPP_STR.to_string()
+        };
+        write!(f, "{}", str)
     }
 }
 

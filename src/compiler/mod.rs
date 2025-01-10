@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use crate::error::{Error, Result};
-use crate::project::{CopperProjectCompiler, UnitType};
+use crate::project::{CopperProjectCompiler, CopperProjectLanguage, UnitType};
 
 mod gcc;
 
@@ -16,25 +16,31 @@ pub trait Compiler {
 pub struct CompileOptions {
     target_name: String,
     target_type: UnitType,
+    target_language: CopperProjectLanguage,
     target_source_files: Vec<PathBuf>,
     target_output_directory: PathBuf,
     target_intermediate_directory: PathBuf,
+    target_include_paths: Option<Vec<PathBuf>>
 }
 
 impl CompileOptions {
     pub fn new(
         target_name: String,
         target_type: UnitType,
+        target_language: CopperProjectLanguage,
         target_source_files: Vec<PathBuf>,
         target_output_directory: PathBuf,
         target_intermediate_directory: PathBuf,
+        target_include_paths: Option<Vec<PathBuf>>
     ) -> Self {
         CompileOptions {
             target_name,
             target_type,
+            target_language,
             target_source_files,
             target_output_directory,
             target_intermediate_directory,
+            target_include_paths
         }
     }
 }
@@ -52,13 +58,22 @@ pub fn get_compiler(compiler: CopperProjectCompiler, options: CompileOptions) ->
 struct CompilerCommandFlags {
     output: String,
     compile: String,
+    include_directory: String,
+    language: String
 }
 
 impl CompilerCommandFlags {
-    fn new(output_flag: &str, compile_flag: &str) -> Self {
+    fn new(
+        output_flag: &str,
+        compile_flag: &str,
+        include_directory: &str,
+        language: &str,
+    ) -> Self {
         CompilerCommandFlags {
             output: output_flag.to_string(),
-            compile: compile_flag.to_string()
+            compile: compile_flag.to_string(),
+            include_directory: include_directory.to_string(),
+            language: language.to_string()
         }
     }
 }
@@ -89,16 +104,16 @@ impl CompilerCommand {
 /// Executor for the compiler command itself
 struct CompilerCommandExecutor<'a> {
     command: Command,
-    option_flags: &'a CompilerCommandFlags,
+    flags: &'a CompilerCommandFlags,
 }
 
 impl<'a> CompilerCommandExecutor<'a> {
-    pub fn new(executable_name: &str, options_flags: &'a CompilerCommandFlags) -> Self {
+    pub fn new(executable_name: &str, flags: &'a CompilerCommandFlags) -> Self {
         let command = Command::new(executable_name);
 
         CompilerCommandExecutor {
             command,
-            option_flags: options_flags,
+            flags,
         }
     }
 
@@ -110,20 +125,38 @@ impl<'a> CompilerCommandExecutor<'a> {
         }
 
         self.command
-            .arg(&self.option_flags.output)
+            .arg(&self.flags.output)
             .arg(output_file);
 
         Ok(())
     }
 
     /// Compile provided source file into an object file
-    pub fn compile(&mut self, source_file: &Path) -> Result<()> {
+    pub fn compile(&mut self, source_file: &Path, language: Option<&str>, include_paths: &Option<Vec<PathBuf>>) -> Result<()> {
         if !source_file.exists() {
             return Err(Error::CompilerError(format!("File {:?} does not exist", source_file)))
         }
 
+        if let Some(language) = language {
+            self.command
+                .arg(&self.flags.language)
+                .arg(language);
+        }
+
+        if let Some(include_paths) = include_paths {
+            for include_path in include_paths {
+                if !include_path.exists() {
+                    return Err(Error::CompilerError(format!("Directory {:?} does not exist", include_path)))
+                }
+
+                self.command
+                    .arg(&self.flags.include_directory)
+                    .arg(include_path);
+            }
+        }
+
         self.command
-            .arg(&self.option_flags.compile)
+            .arg(&self.flags.compile)
             .arg(source_file);
 
         Ok(())

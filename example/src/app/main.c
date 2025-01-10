@@ -1,4 +1,4 @@
-#include "./greeter.h"
+#include "greeter.h"
 
 int main(int argc, const char* argv[])
 {
