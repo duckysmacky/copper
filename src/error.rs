@@ -16,14 +16,6 @@ pub enum Error {
     UnitError(String),
     /// Error related to writing and reading files and directories 
     IOError(String),
-    /// Error related to the language compiler and its process
-    CompilerError(String),
-    /// Error related to the compilation of the source files
-    CompileError(Output),
-    /// Error related to the linking of the object files
-    LinkError(Output),
-    /// Error related to general build errors
-    BuildError(String),
     /// Error related to being unable to parse enum values
     EnumParseError(String),
 }
@@ -36,10 +28,6 @@ impl Display for Error {
             Error::ProjectError(s) => write!(f, "Project error: {}", s),
             Error::UnitError(s) => write!(f, "Project unit error: {}", s),
             Error::IOError(s) => write!(f, "IO error: {}", s),
-            Error::CompilerError(s) => write!(f, "Compiler error: {}", s),
-            Error::CompileError(output) => write!(f, "Compiling failed {}", parse_output(output)),
-            Error::LinkError(output) => write!(f, "Linking failed {}", parse_output(output)),
-            Error::BuildError(s) => write!(f, "Build failed {}", s),
             Error::EnumParseError(s) => write!(f, "Unable to parse an enum: {}", s),
         }
     }
@@ -55,7 +43,7 @@ impl From<std::io::Error> for Error {
 }
 
 /// Parses the output object and returns a formatted string containing exit code, stdout and stderr
-fn parse_output(output: &Output) -> String {
+pub fn parse_output(output: &Output) -> String {
     let mut message = String::new();
     message.push_str(format!("(Error code {})", output.status).as_str());
 

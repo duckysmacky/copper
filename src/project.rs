@@ -1,9 +1,11 @@
+use crate::compiler::CompilerError;
 use std::ffi::OsString;
 use std::fmt::Display;
 use std::string::String;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use serde::{Deserialize, Serialize};
 use crate::compiler::{self, CompileOptions, Compiler};
 use crate::error::{Result, Error};
@@ -217,7 +219,11 @@ impl CopperUnit {
         }
         
         let compiler = compiler::get_compiler(&project.compiler, compile_options);
-        compiler.build();
+        if let Err(err) = compiler.build() {
+            eprintln!("Compiler error while building {}", self.name);
+            eprintln!("{}", err.display());
+            exit(1);
+        }
 
         Ok(())
     }

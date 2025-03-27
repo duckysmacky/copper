@@ -1,6 +1,7 @@
+use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
-use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags};
-use crate::error::{Error, Result};
+use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags, CompilerError};
+use crate::error::parse_output;
 use crate::project::{CopperProjectLanguage, UnitType};
 
 /// GCC-specific string constants
@@ -14,6 +15,34 @@ mod constants {
         pub const LANGUAGE: &str = "-x";
     }
 }
+
+/// GCC-specific error types
+enum Error {
+    /// Error related to the compilation of the source files
+    CompileError(String),
+    /// Error related to the linking of the object files
+    LinkError(String),
+    /// Error related to general build errors
+    BuildError(String),
+}
+
+impl CompilerError for Error {
+    fn display(&self) -> String {
+        format!("GCC Error - {}", self)
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::CompileError(s) => write!(f, "Compiling failed ({})", s),
+            Error::LinkError(s) => write!(f, "Linking failed ({})", s),
+            Error::BuildError(s) => write!(f, "Build failed ({})", s),
+        }   
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>; 
 
 /// Options for the GCC compiler
 pub struct GCCCompiler {
@@ -53,16 +82,10 @@ impl From<CompileOptions> for GCCCompiler {
 
 impl Compiler for GCCCompiler {
     /// Build implementation for GCC
-    fn build(&self) {
-        if let Err(err) = self.compile() {
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
-        
-        if let Err(err) = self.link() {
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
+    fn build(&self) -> Result<()> {
+        self.compile()?;
+        self.link()?;
+        Ok(())
     }
 }
 
@@ -74,12 +97,15 @@ impl GCCCompiler {
             output_file.set_extension("o");
 
             let mut command = self.command.executor();
-            command.output(&output_file)?;
-            command.compile(source_file, Some(&self.target_language.to_string()), &self.include_paths)?;
-            let output = command.execute()?;
+            command.output(&output_file)
+                .map_err(|err| Error::CompileError(err.to_string()))?;
+            command.compile(source_file, Some(&self.target_language.to_string()), &self.include_paths)
+                .map_err(|err| Error::CompileError(err.to_string()))?;
+            let output = command.execute()
+                .map_err(|err| Error::CompileError(err.to_string()))?;
 
             if !output.status.success() {
-                return Err(Error::CompileError(output));
+                return Err(Error::CompileError(parse_output(&output)));
             }
         }
 
@@ -95,12 +121,15 @@ impl GCCCompiler {
         let output_file = self.build_directory.join(&self.target_name);
 
         let mut command = self.command.executor();
-        command.output(&output_file)?;
-        command.link(&object_files)?;
-        let output = command.execute()?;
+        command.output(&output_file)
+            .map_err(|err| Error::LinkError(err.to_string()))?;
+        command.link(&object_files)
+            .map_err(|err| Error::LinkError(err.to_string()))?;
+        let output = command.execute()
+            .map_err(|err| Error::LinkError(err.to_string()))?;
 
         if !output.status.success() {
-            return Err(Error::LinkError(output));
+            return Err(Error::LinkError(parse_output(&output)));
         }
         
         Ok(())

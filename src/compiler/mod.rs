@@ -1,7 +1,6 @@
-use std::fs;
+use std::{fs, io};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use crate::error::{Error, Result};
 use crate::project::{CopperProjectCompiler, CopperProjectLanguage, UnitType};
 
 mod gcc;
@@ -9,7 +8,13 @@ mod gcc;
 /// Compiler trait to generically refer to
 pub trait Compiler {
     /// Builds the unit with the provided Compile Options using the selected compiler
-    fn build(&self);
+    fn build(&self) -> Result<(), impl CompilerError>;
+}
+
+/// A generic compiler error
+pub trait CompilerError {
+    /// Display the error in a pretty way
+    fn display(&self) -> String;
 }
 
 /// General compile options
@@ -121,7 +126,7 @@ impl<'a> CompilerCommandExecutor<'a> {
     }
 
     /// Specify the expected output file
-    pub fn output(&mut self, output_file: &Path) -> Result<()> {
+    pub fn output(&mut self, output_file: &Path) -> io::Result<()> {
         let output_dir = output_file.parent().unwrap();
         if !output_dir.exists() {
             fs::create_dir_all(output_dir)?;
@@ -135,9 +140,9 @@ impl<'a> CompilerCommandExecutor<'a> {
     }
 
     /// Compile provided source file into an object file
-    pub fn compile(&mut self, source_file: &Path, language: Option<&str>, include_paths: &Option<Vec<PathBuf>>) -> Result<()> {
+    pub fn compile(&mut self, source_file: &Path, language: Option<&str>, include_paths: &Option<Vec<PathBuf>>) -> io::Result<()> {
         if !source_file.exists() {
-            return Err(Error::CompilerError(format!("File {:?} does not exist", source_file)))
+            return Err(io::Error::new(io::ErrorKind::NotFound, format!("Source file {:?} does not exist", source_file)));
         }
 
         if let Some(language) = language {
@@ -149,7 +154,7 @@ impl<'a> CompilerCommandExecutor<'a> {
         if let Some(include_paths) = include_paths {
             for include_path in include_paths {
                 if !include_path.exists() {
-                    return Err(Error::CompilerError(format!("Directory {:?} does not exist", include_path)))
+                    return Err(io::Error::new(io::ErrorKind::NotFound, format!("Include path {:?} does not exist", include_path)));
                 }
 
                 self.command
@@ -166,10 +171,10 @@ impl<'a> CompilerCommandExecutor<'a> {
     }
 
     /// Link object files into a single file
-    pub fn link(&mut self, object_files: &Vec<PathBuf>) -> Result<()> {
+    pub fn link(&mut self, object_files: &Vec<PathBuf>) -> io::Result<()> {
         for object_file in object_files {
             if !object_file.exists() {
-                return Err(Error::CompilerError(format!("File {:?} does not exist", object_file)))
+                return Err(io::Error::new(io::ErrorKind::NotFound, format!("Object file {:?} does not exist", object_file)));
             }
         }
 
@@ -180,10 +185,7 @@ impl<'a> CompilerCommandExecutor<'a> {
     }
 
     /// Consumes itself and spawns the process, waits for its completion and returns the output
-    pub fn execute(mut self) -> Result<Output> {
-        let output = self.command.output()
-            .map_err(|err| Error::CompilerError(format!("Unable to spawn compiler process ({})", err)))?;
-
-        Ok(output)
+    pub fn execute(mut self) -> io::Result<Output> {
+        self.command.output()
     }
 }
