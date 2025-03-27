@@ -200,21 +200,22 @@ impl CopperUnit {
             UnitType::StaticLibrary => todo!()
         }
 
-        let include_paths = if let Some(paths) = &project.include_paths {
-                let paths = paths.iter()
-                    .map(|path| project.project_location.join(path))
-                    .collect();
-                Some(paths)
-            } else { None };
-        let compile_options = CompileOptions::new(
+        let mut compile_options = CompileOptions::new(
             self.name.clone(),
             self.r#type.clone(),
             project.language.clone(),
             source_file_paths,
             project.project_location.join(&self.output_directory),
             project.project_location.join(&self.intermediate_directory),
-            include_paths
         );
+
+        if let Some(include_paths) = &project.include_paths {
+            let include_paths: Vec<PathBuf> = include_paths.iter()
+                .map(|path| project.project_location.join(path))
+                .collect();
+            compile_options.include_paths(include_paths);
+        }
+        
         let compiler = compiler::get_compiler(&project.compiler, compile_options);
         compiler.build();
 

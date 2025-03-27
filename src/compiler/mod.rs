@@ -17,10 +17,10 @@ pub struct CompileOptions {
     target_name: String,
     target_type: UnitType,
     target_language: CopperProjectLanguage,
-    target_source_files: Vec<PathBuf>,
-    target_output_directory: PathBuf,
-    target_intermediate_directory: PathBuf,
-    target_include_paths: Option<Vec<PathBuf>>
+    source_files: Vec<PathBuf>,
+    output_directory: PathBuf,
+    intermediate_directory: PathBuf,
+    include_paths: Option<Vec<PathBuf>>
 }
 
 impl CompileOptions {
@@ -31,17 +31,20 @@ impl CompileOptions {
         target_source_files: Vec<PathBuf>,
         target_output_directory: PathBuf,
         target_intermediate_directory: PathBuf,
-        target_include_paths: Option<Vec<PathBuf>>
     ) -> Self {
         CompileOptions {
             target_name,
             target_type,
             target_language,
-            target_source_files,
-            target_output_directory,
-            target_intermediate_directory,
-            target_include_paths
+            source_files: target_source_files,
+            output_directory: target_output_directory,
+            intermediate_directory: target_intermediate_directory,
+            include_paths: None,
         }
+    }
+    
+    pub fn include_paths(&mut self, include_paths: Vec<PathBuf>) {
+        self.include_paths = Some(include_paths);
     }
 }
 

@@ -22,14 +22,14 @@ pub struct GCCCompiler {
     #[allow(dead_code)]
     target_type: UnitType,
     target_language: CopperProjectLanguage,
-    target_source_files: Vec<PathBuf>,
-    target_build_directory: PathBuf,
-    target_intermediate_directory: PathBuf,
-    target_include_paths: Option<Vec<PathBuf>>
+    source_files: Vec<PathBuf>,
+    build_directory: PathBuf,
+    intermediate_directory: PathBuf,
+    include_paths: Option<Vec<PathBuf>>
 }
 
 impl From<CompileOptions> for GCCCompiler {
-    /// Creates a new GCC Compiler from the compile options
+    /// Creates a new GCC Compiler from general compile options
     fn from(options: CompileOptions) -> Self {
         let compiler_flags = CompilerCommandFlags::new(
             constants::flags::OUTPUT,
@@ -43,10 +43,10 @@ impl From<CompileOptions> for GCCCompiler {
             target_name: options.target_name,
             target_type: options.target_type,
             target_language: options.target_language,
-            target_source_files: options.target_source_files,
-            target_build_directory: options.target_output_directory,
-            target_intermediate_directory: options.target_intermediate_directory,
-            target_include_paths: options.target_include_paths
+            source_files: options.source_files,
+            build_directory: options.output_directory,
+            intermediate_directory: options.intermediate_directory,
+            include_paths: options.include_paths
         }
     }
 }
@@ -69,13 +69,13 @@ impl Compiler for GCCCompiler {
 impl GCCCompiler {
     /// Compiles source files into object files
     fn compile(&self) -> Result<()> {
-        for source_file in &self.target_source_files {
-            let mut output_file = self.target_intermediate_directory.join(source_file.file_name().unwrap());
+        for source_file in &self.source_files {
+            let mut output_file = self.intermediate_directory.join(source_file.file_name().unwrap());
             output_file.set_extension("o");
 
             let mut command = self.command.executor();
             command.output(&output_file)?;
-            command.compile(source_file, Some(&self.target_language.to_string()), &self.target_include_paths)?;
+            command.compile(source_file, Some(&self.target_language.to_string()), &self.include_paths)?;
             let output = command.execute()?;
 
             if !output.status.success() {
@@ -88,11 +88,11 @@ impl GCCCompiler {
 
     /// Links compiled object files to the output file
     fn link(&self) -> Result<()> {
-        let mut object_files = self.target_source_files.iter()
-            .map(|source_file| self.target_intermediate_directory.join(source_file.file_name().unwrap()))
+        let mut object_files = self.source_files.iter()
+            .map(|source_file| self.intermediate_directory.join(source_file.file_name().unwrap()))
             .collect::<Vec<PathBuf>>();
         object_files.iter_mut().for_each(|path| { path.set_extension("o"); });
-        let output_file = self.target_build_directory.join(&self.target_name);
+        let output_file = self.build_directory.join(&self.target_name);
 
         let mut command = self.command.executor();
         command.output(&output_file)?;
