@@ -1,8 +1,7 @@
 use std::{fs, io, process};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use crate::config::project::{ProjectCompiler, ProjectLanguage};
-use crate::config::unit::UnitType;
+use crate::config::{ProjectLanguage, UnitType, ProjectCompiler};
 
 mod gcc;
 mod util;

@@ -2,7 +2,7 @@
 
 use std::env;
 use std::path::PathBuf;
-use crate::config::project::ProjectCompiler;
+use crate::config::ProjectCompiler;
 
 // TODO: improve logic, add better availability feedback
 /// A basic function to check weather the compiler is available to use (checks if the system has the

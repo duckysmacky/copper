@@ -1,8 +1,20 @@
-pub mod unit;
-pub mod project;
-mod error;
+//! Contains types and functions for managing project configuration
 
+mod unit;
+mod project;
+mod error;
+mod language;
+mod compiler;
+
+pub use project::ProjectConfig;
+pub use unit::{UnitConfig, UnitType};
+pub use language::ProjectLanguage;
+pub use compiler::ProjectCompiler;
 pub use error::{Error, Result};
+
+pub const PROJECT_FILE_NAME: &str = "copper.toml";
+#[allow(dead_code)]
+pub const PROJECT_DIRECTORY_NAME: &str = ".copper";
 
 /// Contains default values for project configuration
 pub mod default {
@@ -35,7 +47,3 @@ mod equals {
     pub const OBJECT_DIRECTORY: Eq<PathBuf> = |path| path.eq(&default::OBJECT_DIRECTORY());
     pub const SOURCE_DIRECTORY: Eq<PathBuf> = |path| path.eq(&default::SOURCE_DIRECTORY());
 }
-
-pub const PROJECT_FILE_NAME: &str = "copper.toml";
-#[allow(dead_code)]
-pub const PROJECT_DIRECTORY_NAME: &str = ".copper";

@@ -1,8 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags, CompilerError};
-use crate::config::project::ProjectLanguage;
-use crate::config::unit::UnitType;
+use crate::config::{UnitType, ProjectLanguage};
 use crate::error::parse_output;
 
 /// GCC-specific string constants

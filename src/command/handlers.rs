@@ -2,13 +2,13 @@ use std::env;
 use std::path::{Path, PathBuf};
 use clap::ArgMatches;
 use crate::jobs;
-use crate::config::{project, unit};
+use crate::config::{ProjectLanguage, UnitType};
 
 pub fn handle_init(matches: &ArgMatches) {
     let project_language = {
         let language_str = matches.get_one::<String>("language").unwrap();
         // Safe to unwrap as we already checked for valid enum strings
-        project::ProjectLanguage::try_from(language_str.to_string()).unwrap()
+        ProjectLanguage::try_from(language_str.to_string()).unwrap()
     };
     
     let project_location = {
@@ -60,7 +60,7 @@ pub fn handle_new(matches: &ArgMatches) {
         let unit_type = {
             let type_str = matches.get_one::<String>("type").unwrap();
             // Safe to unwrap as we already checked for valid enum strings
-            unit::UnitType::try_from(type_str.to_string()).unwrap()
+            UnitType::try_from(type_str.to_string()).unwrap()
         };
 
         jobs::new::new_unit(project_location, unit_name, unit_type.clone(), unit_path);

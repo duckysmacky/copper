@@ -1,15 +1,14 @@
 use std::ffi::OsString;
 use std::fmt::Display;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io, process};
+use serde::{Deserialize, Serialize};
 use crate::compiler::CompileOptions;
-use crate::config::project::CopperProject;
-use super::{Error, Result};
+use super::{ProjectConfig, Error, Result};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CopperUnit {
+pub struct UnitConfig {
     /// Name of the unit
     pub name: String,
     /// Type of the unit
@@ -28,7 +27,7 @@ pub struct CopperUnit {
     additional_compiler_args: Option<String>,
 }
 
-impl CopperUnit {
+impl UnitConfig {
     pub fn new(
         name: String,
         r#type: UnitType,
@@ -38,7 +37,7 @@ impl CopperUnit {
         include_paths: Option<Vec<PathBuf>>,
         additional_compiler_args: Option<String>,
     ) -> Self {
-        CopperUnit {
+        UnitConfig {
             name,
             r#type,
             source,
@@ -51,7 +50,7 @@ impl CopperUnit {
     
     /// Collects needed information about the unit and builds it according to its type and selected
     /// project compiler and returns compile options for later usage with a compiler
-    pub fn get_compile_options(&self, parent_project: &CopperProject) -> Result<CompileOptions> {
+    pub fn get_compile_options(&self, parent_project: &ProjectConfig) -> Result<CompileOptions> {
         let unit_path = parent_project.project_location.join(&self.source);
 
         let mut source_file_paths = Vec::new();
@@ -152,7 +151,7 @@ impl CopperUnit {
     }
 
     /// Generates an output directory based on the project's defaults and self's type
-    fn generate_output_directory(&self, parent_project: &CopperProject) -> PathBuf {
+    fn generate_output_directory(&self, parent_project: &ProjectConfig) -> PathBuf {
         let build_dir = &parent_project.default_build_directory;
 
         match self.r#type {
@@ -162,7 +161,7 @@ impl CopperUnit {
     }
 
     /// Generates an intermediate directory based on the project's defaults
-    fn generate_intermediate_directory(&self, parent_project: &CopperProject) -> PathBuf {
+    fn generate_intermediate_directory(&self, parent_project: &ProjectConfig) -> PathBuf {
         parent_project.default_build_directory.join(&parent_project.default_object_directory)
     }
 }

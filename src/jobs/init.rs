@@ -1,10 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
-use crate::config;
-use crate::config::{
-    project::{CopperProject, ProjectLanguage, ProjectCompiler},
-    unit::{CopperUnit, UnitType}
-};
+use crate::config::{self, ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
 
 /// Initiates a new copper project by generating a copper.toml in the provided project location and
 /// filling in all the required data
@@ -45,7 +41,7 @@ pub fn init(
         }
     }
 
-    let project = CopperProject::new(
+    let project = ProjectConfig::new(
         project_location.to_path_buf(),
         project_name,
         project_language,
@@ -69,7 +65,7 @@ pub fn init(
 
 /// Generates an example project configuration. Creates default directories and appends example
 /// unit and include path to project data
-fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
+fn add_example_config(project_location: &Path, units: &mut Vec<UnitConfig>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
     use config::default;
     
     let src_dir = default::SOURCE_DIRECTORY();
@@ -88,7 +84,7 @@ fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, incl
 
     *include_paths = Some(vec![include_dir]);
 
-    units.push(CopperUnit::new(
+    units.push(UnitConfig::new(
         "example_app".to_string(),
         UnitType::Binary,
         unit_dir,

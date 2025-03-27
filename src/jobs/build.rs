@@ -1,11 +1,10 @@
 use std::path::Path;
 use std::process;
-use crate::{compiler::{self, Compiler, CompilerError}, config::{
-    project::CopperProject, unit::CopperUnit, Error, Result
-}};
+use crate::compiler::{self, Compiler, CompilerError};
+use crate::config::{ProjectConfig, UnitConfig, Error, Result};
 
 pub fn build<'a>(units: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
-    let project = match CopperProject::import(project_location) {
+    let project = match ProjectConfig::import(project_location) {
         Ok(project) => project,
         Err(err) => {
             eprintln!("Unable to import project: {}", err);
@@ -23,7 +22,7 @@ pub fn build<'a>(units: Option<impl Iterator<Item = &'a String>>, project_locati
 }
 
 /// Builds specifies units (by name) or the whole project (all units)
-fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Item = &'a String>>) -> Result<()> {
+fn build_units<'a>(project: &ProjectConfig, unit_names: Option<impl Iterator<Item = &'a String>>) -> Result<()> {
     let unit_names = match unit_names {
         None => project.get_unit_names(),
         Some(names) => names.collect(),
@@ -45,7 +44,7 @@ fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Ite
 
 /// Builds a unit by first getting compile options and then running a compiler using those
 /// options
-fn build_unit(project: &CopperProject, unit: &CopperUnit) {
+fn build_unit(project: &ProjectConfig, unit: &UnitConfig) {
     let compile_options = match unit.get_compile_options(project) {
         Ok(options) => options,
         Err(err) => {

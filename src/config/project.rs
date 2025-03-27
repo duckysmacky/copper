@@ -1,17 +1,13 @@
 use std::process;
-use std::ffi::OsString;
-use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
-use crate::config::unit::{CopperUnit, UnitType};
-use crate::error::Error;
-use super::{default, equals, PROJECT_FILE_NAME};
+use super::{default, equals, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
 
 /// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CopperProject {
+pub struct ProjectConfig {
     /// Location of the Copper project relative to where the command was executed.
     #[serde(skip)]
     pub project_location: PathBuf,
@@ -44,10 +40,10 @@ pub struct CopperProject {
     /// Unit configuration data
     #[serde(rename = "Unit")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    units: Vec<CopperUnit>,
+    units: Vec<UnitConfig>,
 }
 
-impl CopperProject {
+impl ProjectConfig {
     pub fn new(
         project_location: PathBuf,
         name: String,
@@ -55,9 +51,9 @@ impl CopperProject {
         compiler: ProjectCompiler,
         global_include_paths: Option<Vec<PathBuf>>,
         global_compiler_args: Option<String>,
-        units: Vec<CopperUnit>,
+        units: Vec<UnitConfig>,
     ) -> Self {
-        CopperProject {
+        ProjectConfig {
             project_location,
             name,
             language,
@@ -80,7 +76,7 @@ impl CopperProject {
         let mut file_data = String::new();
         file.read_to_string(&mut file_data)?;
 
-        let mut project: CopperProject = match toml::from_str(&file_data) {
+        let mut project: ProjectConfig = match toml::from_str(&file_data) {
             Ok(project) => project,
             Err(err) => {
                 eprintln!("Unable to deserialize project: {}", err);
@@ -117,7 +113,7 @@ impl CopperProject {
             UnitType::StaticLibrary => &self.default_library_directory,
         };
 
-        self.units.push(CopperUnit::new(
+        self.units.push(UnitConfig::new(
             unit_name,
             unit_type,
             unit_source,
@@ -129,7 +125,7 @@ impl CopperProject {
     }
 
     /// Searches for a unit in project by the provided name. If not found, returns None
-    pub fn find_unit(&self, unit_name: &str) -> Option<&CopperUnit> {
+    pub fn find_unit(&self, unit_name: &str) -> Option<&UnitConfig> {
         let unit = self.units.iter()
             .find(|u| &u.name == unit_name);
 
@@ -147,114 +143,3 @@ impl CopperProject {
         .collect()
     }
 }
-
-/// Enum representing available project languages
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(try_from = "String", into = "String")]
-pub enum ProjectLanguage {
-    C,
-    CPP
-}
-
-impl ProjectLanguage {
-    const C_STR: &'static str = "c";
-    const CPP_STR: &'static str = "c++";
-    const C_EXTENSIONS: [&'static str; 1] = ["c"];
-    const CPP_EXTENSIONS: [&'static str; 2] = ["c", "cpp"];
-
-    /// Returns an array of possible unit type variants as stings
-    pub fn get_strings() -> [&'static str; 2] {
-        [
-            Self::C_STR,
-            Self::CPP_STR
-        ]
-    }
-
-    /// Returns a vector containing possible source file extensions for the specific language
-    pub fn extensions(&self) -> Vec<OsString> {
-        match self {
-            ProjectLanguage::C => Vec::from(Self::C_EXTENSIONS),
-            ProjectLanguage::CPP => Vec::from(Self::CPP_EXTENSIONS)
-        }.into_iter()
-            .map(OsString::from)
-            .collect()
-    }
-}
-
-impl TryFrom<String> for ProjectLanguage {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.to_lowercase().as_str() {
-            Self::C_STR => Ok(ProjectLanguage::C),
-            Self::CPP_STR => Ok(ProjectLanguage::CPP),
-            _ => Err(Error::EnumParseError(format!("Unexpected language value: {}", value)))
-        }
-    }
-}
-
-impl Into<String> for ProjectLanguage {
-    fn into(self) -> String {
-        match self {
-            ProjectLanguage::C => Self::C_STR.to_string(),
-            ProjectLanguage::CPP => Self::CPP_STR.to_string()
-        }
-    }
-}
-
-impl Display for ProjectLanguage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            ProjectLanguage::C => Self::C_STR.to_string(),
-            ProjectLanguage::CPP => Self::CPP_STR.to_string()
-        };
-        write!(f, "{}", str)
-    }
-}
-
-/// Enum representing available project compilers
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(try_from = "String", into = "String")]
-pub enum ProjectCompiler {
-    GCC,
-    GPP,
-    CLANG,
-    MSVC
-}
-
-impl ProjectCompiler {
-    pub fn get_executable(&self) -> String {
-        match self {
-            ProjectCompiler::GCC => "gcc".to_string(),
-            ProjectCompiler::GPP => "g++".to_string(),
-            ProjectCompiler::CLANG => "clang".to_string(),
-            ProjectCompiler::MSVC => "cl".to_string()
-        }
-    }
-}
-
-impl TryFrom<String> for ProjectCompiler {
-    type Error = Error;
-    
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.to_lowercase().as_str() {
-            "gcc" => Ok(ProjectCompiler::GCC),
-            "g++" => Ok(ProjectCompiler::GPP),
-            "clang" => Ok(ProjectCompiler::CLANG),
-            "msvc" => Ok(ProjectCompiler::MSVC),
-            _ => Err(Error::EnumParseError(format!("Unexpected compiler value: {}", value)))
-        }
-    }
-}
-
-impl Into<String> for ProjectCompiler {
-    fn into(self) -> String {
-        match self {
-            ProjectCompiler::GCC => "gcc".to_string(),
-            ProjectCompiler::GPP => "g++".to_string(),
-            ProjectCompiler::CLANG => "clang".to_string(),
-            ProjectCompiler::MSVC => "msvc".to_string()
-        }
-    }
-}
-

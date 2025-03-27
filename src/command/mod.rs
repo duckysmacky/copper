@@ -1,5 +1,5 @@
 use clap::{command, Arg, ArgAction, ArgMatches, Command};
-use crate::config::{project, unit};
+use crate::config::{ProjectLanguage, UnitType};
 
 mod handlers;
 
@@ -22,7 +22,7 @@ pub fn get_command() -> Command {
                 .help("Specify the language of the project")
                 .long("lang")
                 .default_value("c")
-                .value_parser(project::ProjectLanguage::get_strings())
+                .value_parser(ProjectLanguage::get_strings())
             )
             .arg(Arg::new("name")
                 .help("Specify the project name")
@@ -61,7 +61,7 @@ pub fn get_command() -> Command {
                 .arg(Arg::new("type")
                     .help("Specify the type of the unit")
                     .required(true)
-                    .value_parser(unit::UnitType::get_strings())
+                    .value_parser(UnitType::get_strings())
                 )
             )
         )

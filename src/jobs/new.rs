@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use crate::config::project::CopperProject;
-use crate::config::unit::UnitType;
+use crate::config::{ProjectConfig, UnitType};
 
 pub fn new_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
-    let project = CopperProject::import(project_location);
+    let project = ProjectConfig::import(project_location);
 
     match project {
         Ok(mut project) => {
