@@ -30,7 +30,9 @@ pub fn handle_init(matches: &ArgMatches) {
         }
     };
 
-    jobs::init(project_location, project_name, project_language);
+    let generate_example = matches.get_flag("example") && !matches.get_flag("minimal");
+
+    jobs::init(project_location, project_name, project_language, generate_example);
 }
 
 pub fn handle_build(matches: &ArgMatches) {

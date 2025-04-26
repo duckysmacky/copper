@@ -4,6 +4,7 @@ use std::string::String;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::vec;
 use serde::{Deserialize, Serialize};
 use crate::compiler::{self, CompileOptions, Compiler};
 use crate::error::{Result, Error};
@@ -44,7 +45,12 @@ pub struct CopperProject {
 
 impl CopperProject {
     /// Initialises the project with default values where possible and generates a new .toml file
-    pub fn init(project_location: &Path, project_name: String, project_language: CopperProjectLanguage) -> Result<PathBuf> {
+    pub fn init(
+        project_location: &Path,
+        project_name: String,
+        project_language: CopperProjectLanguage,
+        generate_example: bool
+    ) -> Result<PathBuf> {
         let default_compiler = if cfg!(target_os = "windows") {
             CopperProjectCompiler::MSVC
         } else {
@@ -54,20 +60,35 @@ impl CopperProject {
             }
         };
 
-        let example_unit = CopperUnit::new(
-            "example".to_string(),
-            UnitType::Binary,
-            PathBuf::from("src/"),
-            PathBuf::from("build/bin"),
-            PathBuf::from("build/obj")
-        );
+        let mut include_paths = None;
+        let mut units = Vec::new();
+
+        if generate_example {
+            let src_dir = project_location.join("src");
+            let build_dir = project_location.join("build");
+            
+            // TODO: add skip for 'already exists' io error
+            fs::create_dir_all(src_dir.join("include"))?;
+            fs::create_dir_all(build_dir.join("bin"))?;
+            fs::create_dir_all(build_dir.join("obj"))?;
+
+            include_paths = Some(vec![src_dir.join("include")]);
+
+            units.push(CopperUnit::new(
+                "example".to_string(),
+                UnitType::Binary,
+                PathBuf::from("src/"),
+                PathBuf::from("build/bin"),
+                PathBuf::from("build/obj")
+            ));
+        }
 
         let project = Self {
             name: project_name,
             language: project_language,
             compiler: default_compiler,
-            include_paths: None,
-            units: vec![example_unit],
+            include_paths,
+            units,
             default_build_directory: default::BUILD_DIRECTORY(),
             project_location: project_location.to_path_buf()
         };

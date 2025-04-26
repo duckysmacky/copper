@@ -3,8 +3,8 @@ use std::fs;
 use std::process::exit;
 use crate::project::{CopperProject, CopperProjectLanguage, UnitType};
 
-pub fn init(project_location: &Path, project_name: String, project_language: CopperProjectLanguage) {
-    let project = CopperProject::init(project_location, project_name, project_language);
+pub fn init(project_location: &Path, project_name: String, project_language: CopperProjectLanguage, generate_example: bool) {
+    let project = CopperProject::init(project_location, project_name, project_language, generate_example);
 
     match project {
         Ok(path) => {
