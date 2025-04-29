@@ -36,12 +36,14 @@ pub fn handle_init(matches: &ArgMatches) {
 }
 
 pub fn handle_build(matches: &ArgMatches) {
+    let units = matches.get_many::<String>("units");
+    
     let project_location = {
         let location = matches.get_one::<String>("location").unwrap();
         Path::new(location)
     };
 
-    jobs::build(project_location);
+    jobs::build(units, project_location);
 }
 
 pub fn handle_unit(matches: &ArgMatches) {

@@ -146,12 +146,22 @@ impl CopperProject {
         ))
     }
 
-    /// Builds the whole project
-    pub fn build(&self) -> Result<()> {
-        let units = &self.units;
-
-        for unit in units {
-            unit.build(self)?;
+    /// Builds specifies units (by name) or the whole project
+    pub fn build<'a>(&self, unit_names: Option<impl Iterator<Item = &'a String>>) -> Result<()> {
+        if let Some(unit_names) = unit_names {
+            for unit_name in unit_names {
+                let unit = self.units.iter()
+                    .find(|u| &u.name == unit_name);
+                
+                if let Some(unit) = unit {
+                    unit.build(self)?;
+                } else {
+                    return Err(Error::UnitError(format!("Unknown unit '{}'", unit_name)))
+                }
+            }
+        } else {
+            self.units.iter()
+                .try_for_each(|unit| unit.build(self))?;
         }
 
         Ok(())

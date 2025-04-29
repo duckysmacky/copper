@@ -19,22 +19,21 @@ pub fn init(project_location: &Path, project_name: String, project_language: Cop
 
 }
 
-pub fn build(project_location: &Path) {
+pub fn build<'a>(units: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
     let project = CopperProject::import(project_location);
 
-    match project {
-        Ok(project) => {
-            if let Err(err) = project.build() {
-                println!("Unable to build project");
-                eprintln!("{}", err);
-                exit(1);
-            }
-        }
-        Err(err) => {
-            println!("Unable to import project");
-            eprintln!("{}", err);
-            exit(1);
-        }
+    if let Err(err) = project {
+        println!("Unable to import project");
+        eprintln!("{}", err);
+        exit(1);
+    }
+    
+    let project = project.unwrap();
+    
+    if let Err(err) = project.build(units) {
+        println!("Unable to build project");
+        eprintln!("{}", err);
+        exit(1);
     }
 
     println!("Copper project build finished");
