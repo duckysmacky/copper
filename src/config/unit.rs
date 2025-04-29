@@ -1,3 +1,4 @@
+use crate::compiler::CompilerError;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -11,7 +12,7 @@ use crate::error::Error;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CopperUnit {
     /// Name of the unit
-    pub(crate) name: String,
+    pub name: String,
     /// Type of the unit
     r#type: UnitType,
     /// Location of the unit within the project
@@ -87,7 +88,9 @@ impl CopperUnit {
         }
         
         let compiler = compiler::get_compiler(&project.compiler, compile_options);
-        compiler.build();
+        if let Err(err) = compiler.build() {
+            println!("Error building unit '{}': {}", self.name, err.display());
+        }
 
         Ok(())
     }
