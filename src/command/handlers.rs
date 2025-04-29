@@ -1,13 +1,14 @@
 use std::env;
 use std::path::{Path, PathBuf};
 use clap::ArgMatches;
-use crate::{jobs, project};
+use crate::jobs;
+use crate::config::{project, unit};
 
 pub fn handle_init(matches: &ArgMatches) {
     let project_language = {
         let language_str = matches.get_one::<String>("language").unwrap();
         // Safe to unwrap as we already checked for valid enum strings
-        project::CopperProjectLanguage::try_from(language_str.to_string()).unwrap()
+        project::ProjectLanguage::try_from(language_str.to_string()).unwrap()
     };
     
     let project_location = {
@@ -18,7 +19,7 @@ pub fn handle_init(matches: &ArgMatches) {
     let project_name = match matches.get_one::<String>("name") {
         Some(name) => String::from(name),
         None => {
-            let directory = if project_location == Path::new(".") {
+            let directory = if project_location == Path::new("../..") {
                 let current = env::current_dir().unwrap();
                 let name = current.file_name().unwrap();
                 name.to_os_string()
@@ -57,7 +58,7 @@ pub fn handle_unit(matches: &ArgMatches) {
     let unit_type = {
         let type_str = matches.get_one::<String>("type").unwrap();
         // Safe to unwrap as we already checked for valid enum strings
-        project::UnitType::try_from(type_str.to_string()).unwrap()
+        unit::UnitType::try_from(type_str.to_string()).unwrap()
     };
 
     jobs::add_unit(project_location, unit_name, unit_type.clone(), unit_path);

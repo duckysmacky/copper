@@ -1,7 +1,8 @@
 use std::path::PathBuf;
-use crate::compiler::{CompileOptions, Compiler, CompilerCommand, CompilerCommandFlags};
+use crate::compiler::{CompileOptions, CompilerCommand, CompilerCommandFlags, Compiler};
 use crate::error::{Error, Result};
-use crate::project::{CopperProjectLanguage, UnitType};
+use crate::config::project::ProjectLanguage;
+use crate::config::unit::UnitType;
 
 /// GCC-specific string constants
 mod constants {
@@ -21,7 +22,7 @@ pub struct GCCCompiler {
     target_name: String,
     #[allow(dead_code)]
     target_type: UnitType,
-    target_language: CopperProjectLanguage,
+    target_language: ProjectLanguage,
     source_files: Vec<PathBuf>,
     build_directory: PathBuf,
     intermediate_directory: PathBuf,

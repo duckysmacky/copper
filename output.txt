@@ -1,3 +1,0 @@
-Executing: CommandArgs { inner: ["-x", "c", "-o", "example/build/obj/greeter.o", "-I", "example/src/include/", "-c", "example/src/app/greeter.c"] }
-Executing: CommandArgs { inner: ["-x", "c", "-o", "example/build/obj/main.o", "-I", "example/src/include/", "-c", "example/src/app/main.c"] }
-Executing: CommandArgs { inner: ["-x", "c", "-o", "example/build/bin/app", "example/build/obj/greeter.o", "example/build/obj/main.o"] }

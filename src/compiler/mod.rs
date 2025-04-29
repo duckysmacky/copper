@@ -2,7 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use crate::error::{Error, Result};
-use crate::project::{CopperProjectCompiler, CopperProjectLanguage, UnitType};
+use crate::config::project::{ProjectCompiler, ProjectLanguage};
+use crate::config::unit::UnitType;
 
 mod gcc;
 
@@ -16,7 +17,7 @@ pub trait Compiler {
 pub struct CompileOptions {
     target_name: String,
     target_type: UnitType,
-    target_language: CopperProjectLanguage,
+    target_language: ProjectLanguage,
     source_files: Vec<PathBuf>,
     output_directory: PathBuf,
     intermediate_directory: PathBuf,
@@ -27,7 +28,7 @@ impl CompileOptions {
     pub fn new(
         target_name: String,
         target_type: UnitType,
-        target_language: CopperProjectLanguage,
+        target_language: ProjectLanguage,
         target_source_files: Vec<PathBuf>,
         target_output_directory: PathBuf,
         target_intermediate_directory: PathBuf,
@@ -49,9 +50,9 @@ impl CompileOptions {
 }
 
 /// Returns a specific Compiler based on the chosen project compiler
-pub fn get_compiler(compiler: &CopperProjectCompiler, options: CompileOptions) -> impl Compiler {
+pub fn get_compiler(compiler: &ProjectCompiler, options: CompileOptions) -> impl Compiler {
     match compiler {
-        CopperProjectCompiler::GCC => gcc::GCCCompiler::from(options),
+        ProjectCompiler::GCC => gcc::GCCCompiler::from(options),
         _ => unimplemented!()
     }
 }
