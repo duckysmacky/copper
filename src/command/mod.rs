@@ -5,6 +5,13 @@ mod handlers;
 
 pub fn get_command() -> Command {
     command!()
+        .arg(Arg::new("location")
+            .help("Specify the directory where the Copper project is located")
+            .global(true)
+            .long("path")
+            .default_value(".")
+            .action(ArgAction::Set)
+        )
         .subcommand(Command::new("init")
             .about("Initiate a new Copper project in the current directory")
             .arg(Arg::new("location")
@@ -42,28 +49,20 @@ pub fn get_command() -> Command {
                 .help("Specify units to build")
                 .action(ArgAction::Append)
             )
-            .arg(Arg::new("location")
-                .help("Specify the directory where the Copper project is located")
-                .long("path")
-                .default_value(".")
-                .action(ArgAction::Set)
-            )
         )
-        .subcommand(Command::new("unit")
-            .about("Add a new unit to the Copper project")
-            .arg(Arg::new("source")
-                .help("Specify the directory of the unit")
-                .required(true)
-            )
-            .arg(Arg::new("type")
-                .help("Specify the type of the unit")
-                .required(true)
-                .value_parser(unit::UnitType::get_strings())
-            )
-            .arg(Arg::new("location")
-                .help("Specify the directory where the Copper project is located")
-                .required(false)
-                .default_value(".")
+        .subcommand(Command::new("new")
+            .about("Add a new component to the current Copper project")
+            .subcommand(Command::new("unit")
+                .about("Add a new unit")
+                .arg(Arg::new("source")
+                    .help("Specify the directory of the unit")
+                    .required(true)
+                )
+                .arg(Arg::new("type")
+                    .help("Specify the type of the unit")
+                    .required(true)
+                    .value_parser(unit::UnitType::get_strings())
+                )
             )
         )
 }
@@ -77,7 +76,7 @@ pub fn match_args(matches: ArgMatches) {
         handlers::handle_build(matches);
     }
 
-    if let Some(matches) = matches.subcommand_matches("unit") {
-        handlers::handle_unit(matches);
+    if let Some(matches) = matches.subcommand_matches("new") {
+        handlers::handle_new(matches);
     }
 }

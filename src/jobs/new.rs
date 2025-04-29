@@ -3,7 +3,7 @@ use std::process::exit;
 use crate::config::project::CopperProject;
 use crate::config::unit::UnitType;
 
-pub fn add_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
+pub fn new_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
     let project = CopperProject::import(project_location);
 
     match project {
