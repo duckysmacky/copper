@@ -1,7 +1,9 @@
 pub mod unit;
 pub mod project;
+mod error;
 
-pub mod default {
+/// Contains default values for project configuration
+mod default {
     use std::path::PathBuf;
     type Val<T> = fn() -> T;
 

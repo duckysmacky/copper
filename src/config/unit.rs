@@ -1,12 +1,11 @@
-use crate::compiler::CompilerError;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
 use crate::compiler::{CompileOptions, Compiler};
 use crate::config::project::CopperProject;
-use crate::{compiler, error};
-use crate::error::Error;
+use crate::error::{Error, Result};
+use crate::compiler::{self, CompilerError};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,7 +41,7 @@ impl CopperUnit {
 
     /// Collects needed information about the unit and builds it according to its type and selected
     /// project compiler
-    pub fn build(&self, project: &CopperProject) -> error::Result<()> {
+    pub fn build(&self, project: &CopperProject) -> Result<()> {
         let unit_path = project.project_location.join(&self.source);
         let unit_dir = fs::read_dir(&unit_path)?;
 
@@ -130,7 +129,7 @@ impl Display for UnitType {
 impl TryFrom<String> for UnitType {
     type Error = Error;
     
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             UnitType::BINARY_STR => Ok(UnitType::Binary),
             UnitType::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),

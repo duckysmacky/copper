@@ -10,17 +10,17 @@ use crate::config::{default, PROJECT_FILE_NAME};
 use crate::config::unit::{CopperUnit, UnitType};
 use crate::error::{Error, Result};
 
-/// Main Copper project configuration
+/// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CopperProject {
     /// Name of the project
     name: String,
     /// Chosen language for the project
-    pub(crate) language: ProjectLanguage,
+    pub language: ProjectLanguage,
     /// Chosen compiler for the project
-    pub(crate) compiler: ProjectCompiler,
+    pub compiler: ProjectCompiler,
     /// Additional include paths for the whole project
-    pub(crate) include_paths: Option<Vec<PathBuf>>,
+    pub include_paths: Option<Vec<PathBuf>>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
@@ -30,7 +30,7 @@ pub struct CopperProject {
     default_build_directory: PathBuf,
     /// Location of the Copper project relative to where the command was executed.
     #[serde(skip)]
-    pub(crate) project_location: PathBuf
+    pub project_location: PathBuf
 }
 
 impl CopperProject {
