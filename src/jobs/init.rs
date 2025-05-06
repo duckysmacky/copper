@@ -61,7 +61,7 @@ fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, incl
     fs::create_dir_all(build_dir.join("bin"))?;
     fs::create_dir_all(build_dir.join("obj"))?;
 
-    *include_paths = Some(vec![src_dir.join("include")]);
+    *include_paths = Some(vec![PathBuf::from("src/include")]);
 
     units.push(CopperUnit::new(
         "example".to_string(),

@@ -1,10 +1,10 @@
 name = "example"
 language = "c"
 compiler = "gcc"
-include_paths = ["src/include/"]
+include_paths = ["src/include"]
 
 [[Unit]]
-name = "app"
+name = "example"
 type = "binary"
 source = "src/app"
 output_directory = "build/bin"
