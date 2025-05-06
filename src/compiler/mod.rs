@@ -9,7 +9,8 @@ mod gcc;
 /// Compiler trait to generically refer to
 pub trait Compiler {
     /// Builds the unit with the provided Compile Options using the selected compiler
-    fn build(&self) -> Result<(), impl CompilerError>;
+    fn compile(&self) -> Result<(), impl CompilerError>;
+    fn link(&self) -> Result<(), impl CompilerError>;
 }
 
 /// A generic compiler error

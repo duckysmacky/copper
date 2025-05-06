@@ -40,8 +40,6 @@ impl Display for Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>; 
-
 /// Options for the GCC compiler
 pub struct GCCCompiler {
     command: CompilerCommand,
@@ -79,17 +77,8 @@ impl From<CompileOptions> for GCCCompiler {
 }
 
 impl Compiler for GCCCompiler {
-    /// Build implementation for GCC
-    fn build(&self) -> std::result::Result<(), impl CompilerError> {
-        self.compile()?;
-        self.link()?;
-        Ok::<(), Error>(())
-    }
-}
-
-impl GCCCompiler {
     /// Compiles source files into object files
-    fn compile(&self) -> Result<()> {
+    fn compile(&self) -> std::result::Result<(), impl CompilerError> {
         for source_file in &self.source_files {
             let mut output_file = self.intermediate_directory.join(source_file.file_name().unwrap());
             output_file.set_extension("o");
@@ -111,7 +100,7 @@ impl GCCCompiler {
     }
 
     /// Links compiled object files to the output file
-    fn link(&self) -> Result<()> {
+    fn link(&self) -> std::result::Result<(), impl CompilerError> {
         let mut object_files = self.source_files.iter()
             .map(|source_file| self.intermediate_directory.join(source_file.file_name().unwrap()))
             .collect::<Vec<PathBuf>>();
