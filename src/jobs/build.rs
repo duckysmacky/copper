@@ -1,23 +1,66 @@
 use std::path::Path;
-use std::process::exit;
-use crate::config::project::CopperProject;
+use std::process;
+use crate::{compiler::{self, Compiler, CompilerError}, config::{
+    project::CopperProject, unit::CopperUnit, Error, Result
+}};
 
 pub fn build<'a>(units: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
-    let project = CopperProject::import(project_location);
-
-    if let Err(err) = project {
-        println!("Unable to import project");
-        eprintln!("{}", err);
-        exit(1);
-    }
-
-    let project = project.unwrap();
-
-    if let Err(err) = project.build(units) {
+    let project = match CopperProject::import(project_location) {
+        Ok(project) => project,
+        Err(err) => {
+            eprintln!("Unable to import project: {}", err);
+            process::exit(1);
+        }
+    };
+    
+    if let Err(err) = build_units(&project, units) {
         println!("Unable to build project");
         eprintln!("{}", err);
-        exit(1);
+        process::exit(1);
     }
 
     println!("Copper project build finished");
+}
+
+/// Builds specifies units (by name) or the whole project (all units)
+fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Item = &'a String>>) -> Result<()> {
+    let unit_names = match unit_names {
+        None => project.get_unit_names(),
+        Some(names) => names.collect(),
+    };
+
+    for unit_name in unit_names {
+        match project.find_unit(unit_name) {
+            Some(unit) => build_unit(project, unit),
+            None => return Err(Error::UnitNotFound(unit_name.to_string()))
+        }
+    }
+
+    Ok(())
+}
+
+/// Builds a unit by first getting compile options and then running a compiler using those
+/// options
+fn build_unit(project: &CopperProject, unit: &CopperUnit) {
+    let compile_options = match unit.get_compile_options(project) {
+        Ok(options) => options,
+        Err(err) => {
+            eprintln!("Unable to generate compile options: {}", err);
+            process::exit(1);
+        }
+    };
+
+    let compiler = compiler::get_compiler(&project.compiler, compile_options);
+
+    match compiler.compile() {
+        Ok(_) => println!("Sucessfully compiled '{}'", unit.name),
+        Err(err) => eprintln!("Error compiling '{}':\n{}", unit.name, err.display())
+    }
+
+    match compiler.link() {
+        Ok(_) => println!("Sucessfully linked '{}'", unit.name),
+        Err(err) => eprintln!("Error linking '{}':\n{}", unit.name, err.display())
+    }
+
+    println!("Sucessfully build '{}'", unit.name);
 }

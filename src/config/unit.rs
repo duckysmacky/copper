@@ -2,10 +2,9 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
-use crate::compiler::{CompileOptions, Compiler};
+use crate::compiler::CompileOptions;
 use crate::config::project::CopperProject;
 use crate::error::{Error, Result};
-use crate::compiler::{self, CompilerError};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,9 +39,9 @@ impl CopperUnit {
     }
 
     /// Collects needed information about the unit and builds it according to its type and selected
-    /// project compiler
-    pub fn build(&self, project: &CopperProject) -> Result<()> {
-        let unit_path = project.project_location.join(&self.source);
+    /// project compiler and returns returns compile options for later usage with a compiler
+    pub fn get_compile_options(&self, parent_project: &CopperProject) -> Result<CompileOptions> {
+        let unit_path = parent_project.project_location.join(&self.source);
         let unit_dir = fs::read_dir(&unit_path)?;
 
         let mut source_file_paths: Vec<PathBuf> = Vec::new();
@@ -50,13 +49,13 @@ impl CopperUnit {
             let file_path = entry?.path();
 
             if let Some(ext) = file_path.extension() {
-                if project.language.extensions().contains(&ext.to_os_string()) {
+                if parent_project.language.extensions().contains(&ext.to_os_string()) {
                     source_file_paths.push(file_path);
                 }
             }
         }
 
-        let mut output_dir = PathBuf::from(&project.project_location);
+        let mut output_dir = PathBuf::from(&parent_project.project_location);
         output_dir.push(&self.output_directory);
         fs::create_dir_all(&output_dir)?;
 
@@ -73,25 +72,20 @@ impl CopperUnit {
         let mut compile_options = CompileOptions::new(
             self.name.clone(),
             self.r#type.clone(),
-            project.language.clone(),
+            parent_project.language.clone(),
             source_file_paths,
-            project.project_location.join(&self.output_directory),
-            project.project_location.join(&self.intermediate_directory),
+            parent_project.project_location.join(&self.output_directory),
+            parent_project.project_location.join(&self.intermediate_directory),
         );
 
-        if let Some(include_paths) = &project.include_paths {
+        if let Some(include_paths) = &parent_project.include_paths {
             let include_paths: Vec<PathBuf> = include_paths.iter()
-                .map(|path| project.project_location.join(path))
+                .map(|path| parent_project.project_location.join(path))
                 .collect();
             compile_options.include_paths(include_paths);
         }
         
-        let compiler = compiler::get_compiler(&project.compiler, compile_options);
-        if let Err(err) = compiler.build() {
-            println!("Error building unit '{}': {}", self.name, err.display());
-        }
-
-        Ok(())
+        Ok(compile_options)
     }
 }
 

@@ -2,6 +2,8 @@ pub mod unit;
 pub mod project;
 mod error;
 
+pub use error::{Error, Result};
+
 /// Contains default values for project configuration
 mod default {
     use std::path::PathBuf;

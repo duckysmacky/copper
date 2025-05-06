@@ -1,14 +1,13 @@
 use std::process;
 use std::ffi::OsString;
 use std::fmt::Display;
-use std::string::String;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use crate::config::{default, PROJECT_FILE_NAME};
 use crate::config::unit::{CopperUnit, UnitType};
-use crate::error::{Error, Result};
+use crate::error::Error;
 
 /// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,25 +106,23 @@ impl CopperProject {
         ))
     }
 
-    /// Builds specifies units (by name) or the whole project
-    pub fn build<'a>(&self, unit_names: Option<impl Iterator<Item = &'a String>>) -> Result<()> {
-        if let Some(unit_names) = unit_names {
-            for unit_name in unit_names {
-                let unit = self.units.iter()
-                    .find(|u| &u.name == unit_name);
-                
-                if let Some(unit) = unit {
-                    unit.build(self)?;
-                } else {
-                    return Err(Error::UnitError(format!("Unknown unit '{}'", unit_name)))
-                }
-            }
+    /// Searches for a unit in project by the provided name. If not found, returns None
+    pub fn find_unit(&self, unit_name: &str) -> Option<&CopperUnit> {
+        let unit = self.units.iter()
+            .find(|u| &u.name == unit_name);
+        
+        if let Some(unit) = unit {
+            Some(&unit)
         } else {
-            self.units.iter()
-                .try_for_each(|unit| unit.build(self))?;
+           None
         }
+    }
 
-        Ok(())
+    /// Returns an iterator containing the names of the all project units
+    pub fn get_unit_names(&self) -> Vec<&String> {
+        self.units.iter()
+        .map(|unit| &unit.name)
+        .collect()
     }
 }
 
