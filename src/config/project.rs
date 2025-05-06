@@ -1,10 +1,10 @@
+use std::process;
 use std::ffi::OsString;
 use std::fmt::Display;
 use std::string::String;
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs::File;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::vec;
 use serde::{Deserialize, Serialize};
 use crate::config::{default, PROJECT_FILE_NAME};
 use crate::config::unit::{CopperUnit, UnitType};
@@ -34,86 +34,57 @@ pub struct CopperProject {
 }
 
 impl CopperProject {
-    /// Initialises the project with default values where possible and generates a new .toml file
-    pub fn init(
-        project_location: &Path,
-        project_name: String,
-        project_language: ProjectLanguage,
-        generate_example: bool
-    ) -> Result<PathBuf> {
-        let default_compiler = if cfg!(target_os = "windows") {
-            ProjectCompiler::MSVC
-        } else {
-            match &project_language {
-                ProjectLanguage::C => ProjectCompiler::GCC,
-                ProjectLanguage::CPP => ProjectCompiler::GPP
-            }
-        };
-
-        let mut include_paths = None;
-        let mut units = Vec::new();
-
-        if generate_example {
-            let src_dir = project_location.join("..");
-            let build_dir = project_location.join("build");
-            
-            // TODO: add skip for 'already exists' io error
-            fs::create_dir_all(src_dir.join("include"))?;
-            fs::create_dir_all(build_dir.join("bin"))?;
-            fs::create_dir_all(build_dir.join("obj"))?;
-
-            include_paths = Some(vec![src_dir.join("include")]);
-
-            units.push(CopperUnit::new(
-                "example".to_string(),
-                UnitType::Binary,
-                PathBuf::from("src/"),
-                PathBuf::from("build/bin"),
-                PathBuf::from("build/obj")
-            ));
-        }
-
-        let project = Self {
-            name: project_name,
-            language: project_language,
-            compiler: default_compiler,
+    pub fn new(
+        name: String,
+        language: ProjectLanguage,
+        compiler: ProjectCompiler,
+        include_paths: Option<Vec<PathBuf>>,
+        units: Vec<CopperUnit>,
+        project_location: PathBuf
+    ) -> Self {
+        CopperProject {
+            name,
+            language,
+            compiler,
             include_paths,
             units,
             default_build_directory: default::BUILD_DIRECTORY(),
-            project_location: project_location.to_path_buf()
-        };
-
-        let file_path = project_location.join(PROJECT_FILE_NAME);
-        let mut file = File::create_new(&file_path)?;
-
-        let toml_data = toml::to_string(&project)
-            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
-
-        file.write_all(toml_data.as_bytes())?;
-        file.flush()?;
-        Ok(file_path)
+            project_location
+        }
     }
 
     /// Imports a Copper project from a .toml project file
-    pub fn import(directory: &Path) -> Result<Self> {
+    pub fn import(directory: &Path) -> io::Result<Self> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::open(file_path)?;
 
         let mut file_data = String::new();
         file.read_to_string(&mut file_data)?;
-        let mut project: CopperProject = toml::from_str(&file_data)
-            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
+
+        let mut project: CopperProject = match toml::from_str(&file_data) {
+            Ok(project) => project,
+            Err(err) => {
+                eprintln!("Unable to deserialize project: {}", err);
+                process::exit(1);
+            }
+        };
+
         project.project_location = directory.to_path_buf();
         Ok(project)
     }
 
     /// Saves current Copper project to the .toml project file
-    pub fn save(self, directory: &Path) -> Result<()> {
+    pub fn save(self, directory: &Path) -> io::Result<()> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::create(&file_path)?;
 
-        let toml_data = toml::to_string(&self)
-            .map_err(|err| Error::ProjectConfigError(err.to_string()))?;
+        let toml_data = match toml::to_string(&self) {
+            Ok(toml) => toml,
+            Err(err) => {
+                eprintln!("Unable to serialize project: {}", err);
+                process::exit(1);
+            }
+        };
 
         file.write_all(toml_data.as_bytes())?;
         file.flush()?;
