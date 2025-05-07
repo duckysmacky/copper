@@ -1,10 +1,11 @@
-use std::{fs, io};
+use std::{fs, io, process};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use crate::config::project::{ProjectCompiler, ProjectLanguage};
 use crate::config::unit::UnitType;
 
 mod gcc;
+mod util;
 
 /// Compiler trait to generically refer to
 pub trait Compiler {
@@ -57,6 +58,11 @@ impl CompileOptions {
 
 /// Returns a specific Compiler based on the chosen project compiler
 pub fn get_compiler(compiler: &ProjectCompiler, options: CompileOptions) -> impl Compiler {
+    if !util::check_if_available(compiler) {
+        eprintln!("Unsupported compiler specified (Not available on the current system)");
+        process::exit(1);
+    }
+    
     match compiler {
         ProjectCompiler::GCC => gcc::GCCCompiler::from(options),
         _ => unimplemented!()

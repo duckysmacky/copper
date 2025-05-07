@@ -200,6 +200,17 @@ pub enum ProjectCompiler {
     MSVC
 }
 
+impl ProjectCompiler {
+    pub fn get_executable(&self) -> String {
+        match self {
+            ProjectCompiler::GCC => "gcc".to_string(),
+            ProjectCompiler::GPP => "g++".to_string(),
+            ProjectCompiler::CLANG => "clang".to_string(),
+            ProjectCompiler::MSVC => "cl".to_string()
+        }
+    }
+}
+
 impl TryFrom<String> for ProjectCompiler {
     type Error = Error;
     
