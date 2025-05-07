@@ -39,7 +39,7 @@ impl CopperUnit {
     }
 
     /// Collects needed information about the unit and builds it according to its type and selected
-    /// project compiler and returns returns compile options for later usage with a compiler
+    /// project compiler and returns compile options for later usage with a compiler
     pub fn get_compile_options(&self, parent_project: &CopperProject) -> Result<CompileOptions> {
         let unit_path = parent_project.project_location.join(&self.source);
         let unit_dir = fs::read_dir(&unit_path)?;

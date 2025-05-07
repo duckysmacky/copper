@@ -1,4 +1,4 @@
-//! Project configuration specifc error types and implementations
+//! Project configuration specific error types and implementations
 
 use std::fmt::Display;
 
@@ -9,11 +9,11 @@ pub enum Error {
     ProjectNotFound,
     /// Specified unit was not found in the list of the existing units
     UnitNotFound(String),
-    /// The specficied language doesn't exist
+    /// The specified language doesn't exist
     InvalidLanguage(String),
-    /// The specficied compiler doesn't exist
+    /// The specified compiler doesn't exist
     InvalidCompiler(String),
-    /// The specficied unit type doesn't exist
+    /// The specified unit type doesn't exist
     InvalidUnitType(String),
 }
 

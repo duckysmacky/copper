@@ -53,14 +53,14 @@ fn build_unit(project: &CopperProject, unit: &CopperUnit) {
     let compiler = compiler::get_compiler(&project.compiler, compile_options);
 
     match compiler.compile() {
-        Ok(_) => println!("Sucessfully compiled '{}'", unit.name),
+        Ok(_) => println!("Successfully compiled '{}'", unit.name),
         Err(err) => eprintln!("Error compiling '{}':\n{}", unit.name, err.display())
     }
 
     match compiler.link() {
-        Ok(_) => println!("Sucessfully linked '{}'", unit.name),
+        Ok(_) => println!("Successfully linked '{}'", unit.name),
         Err(err) => eprintln!("Error linking '{}':\n{}", unit.name, err.display())
     }
 
-    println!("Sucessfully build '{}'", unit.name);
+    println!("Successfully built '{}'", unit.name);
 }
