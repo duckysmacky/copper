@@ -1,11 +1,11 @@
 name = "example"
 language = "c"
-compiler = "gcc"
-include_paths = ["src/include"]
+compiler = "msvc"
+include_paths = ['example\src\include']
 
 [[Unit]]
-name = "example"
+name = "app"
 type = "binary"
 source = "src/app"
-output_directory = "build/bin"
-intermediate_directory = "build/obj"
+output_directory = "build/bin/"
+intermediate_directory = "build/obj/"

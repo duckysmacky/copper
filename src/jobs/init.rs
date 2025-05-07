@@ -5,6 +5,8 @@ use crate::config::{
     unit::{CopperUnit, UnitType}
 };
 
+/// Initiates a new copper project by generating a copper.toml in the provided project location and
+/// filling in all the required data
 pub fn init(
     project_location: &Path,
     project_name: String, 
@@ -12,7 +14,7 @@ pub fn init(
     generate_example: bool
 ) {
     let default_compiler = {
-        if cfg!(target_os = "windows") {
+        if cfg!(windows) {
             ProjectCompiler::MSVC
         } else {
             match &project_language {
@@ -25,11 +27,21 @@ pub fn init(
     let mut include_paths = None;
     let mut units = Vec::new();
 
+    if !fs::exists(&project_location).unwrap_or(false) {
+        if let Err(err) = fs::create_dir_all(&project_location) {
+            println!("Error creating project directory: {}", err);
+            process::exit(1);
+        }
+    }
+
     if generate_example {
         match add_example_config(project_location, &mut units, &mut include_paths) {
-            Ok(_) => println!("Sucessfully generated example project structure"),
-            Err(err) => println!("Error generating example project structure: {}", err)
-        };
+            Ok(_) => println!("Successfully generated example project structure"),
+            Err(err) => {
+                println!("Error generating example project structure: {}", err);
+                process::exit(1);
+            }
+        }
     }
 
     let project = CopperProject::new(
@@ -43,8 +55,9 @@ pub fn init(
 
     match project.save(project_location) {
         Ok(_) => {
-            println!("Created a new Copper project at {}", fs::canonicalize(project_location).unwrap().display());
-        }
+            let cannon_path = project_location.canonicalize().unwrap_or(project_location.to_path_buf());
+            println!("Created a new Copper project at '{}'", cannon_path.display());
+        },
         Err(err) => {
             eprintln!("Unable to initialize project: {}", err);
             process::exit(1);
@@ -52,23 +65,31 @@ pub fn init(
     }
 }
 
+/// Generates an example project configuration. Creates default directories and appends example
+/// unit and include path to project data
 fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
-    let src_dir = project_location.join("..");
-    let build_dir = project_location.join("build");
-    
-    // TODO: add skip for 'already exists' io error
-    fs::create_dir_all(src_dir.join("include"))?;
-    fs::create_dir_all(build_dir.join("bin"))?;
-    fs::create_dir_all(build_dir.join("obj"))?;
+    let mut src_dir = PathBuf::from("src");
+    src_dir.push("app");
+    let build_dir = Path::new("build");
 
-    *include_paths = Some(vec![PathBuf::from("src/include")]);
+    let include_dir = src_dir.join("include");
+    let bin_dir = build_dir.join("bin");
+    let obj_dir = build_dir.join("obj");
+
+    /// Skip the error if it is an 'already exists' error (since it is not critical in this case)
+    fn skip_already_exists(err: io::Error) -> io::Result<()> { if err.kind() == io::ErrorKind::AlreadyExists { Ok(()) } else { Err(err) } }
+    fs::create_dir_all(project_location.join(&include_dir)).or_else(skip_already_exists)?;
+    fs::create_dir_all(project_location.join(&bin_dir)).or_else(skip_already_exists)?;
+    fs::create_dir_all(project_location.join(&obj_dir)).or_else(skip_already_exists)?;
+
+    *include_paths = Some(vec![include_dir]);
 
     units.push(CopperUnit::new(
-        "example".to_string(),
+        "example_app".to_string(),
         UnitType::Binary,
-        PathBuf::from("src/"),
-        PathBuf::from("build/bin"),
-        PathBuf::from("build/obj")
+        src_dir,
+        bin_dir,
+        obj_dir,
     ));
 
     Ok(())
