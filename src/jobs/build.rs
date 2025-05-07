@@ -45,7 +45,7 @@ fn build_unit(project: &CopperProject, unit: &CopperUnit) {
     let compile_options = match unit.get_compile_options(project) {
         Ok(options) => options,
         Err(err) => {
-            eprintln!("Unable to generate compile options: {}", err);
+            eprintln!("Unable to build project: {}", err);
             process::exit(1);
         }
     };
@@ -54,12 +54,18 @@ fn build_unit(project: &CopperProject, unit: &CopperUnit) {
 
     match compiler.compile() {
         Ok(_) => println!("Successfully compiled '{}'", unit.name),
-        Err(err) => eprintln!("Error compiling '{}':\n{}", unit.name, err.display())
+        Err(err) => {
+            eprintln!("Error compiling '{}':\n{}", unit.name, err.display());
+            process::exit(1);
+        }
     }
 
     match compiler.link() {
         Ok(_) => println!("Successfully linked '{}'", unit.name),
-        Err(err) => eprintln!("Error linking '{}':\n{}", unit.name, err.display())
+        Err(err) => {
+            eprintln!("Error linking '{}':\n{}", unit.name, err.display());
+            process::exit(1);
+        }
     }
 
     println!("Successfully built '{}'", unit.name);

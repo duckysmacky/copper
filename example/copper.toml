@@ -1,7 +1,7 @@
 name = "example"
 language = "c"
-compiler = "msvc"
-include_paths = ['example\src\include']
+compiler = "gcc"
+include_paths = ['src\include']
 
 [[Unit]]
 name = "app"

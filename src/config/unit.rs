@@ -1,10 +1,11 @@
+use std::ffi::OsString;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::fs;
+use std::{fs, io, process};
 use crate::compiler::CompileOptions;
 use crate::config::project::CopperProject;
-use crate::error::{Error, Result};
+use super::{Error, Result};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,27 +43,29 @@ impl CopperUnit {
     /// project compiler and returns compile options for later usage with a compiler
     pub fn get_compile_options(&self, parent_project: &CopperProject) -> Result<CompileOptions> {
         let unit_path = parent_project.project_location.join(&self.source);
-        let unit_dir = fs::read_dir(&unit_path)?;
 
-        let mut source_file_paths: Vec<PathBuf> = Vec::new();
-        for entry in unit_dir {
-            let file_path = entry?.path();
-
-            if let Some(ext) = file_path.extension() {
-                if parent_project.language.extensions().contains(&ext.to_os_string()) {
-                    source_file_paths.push(file_path);
-                }
-            }
+        let mut source_file_paths = Vec::new();
+        if let Err(err) =  self.get_source_files(&mut source_file_paths, unit_path, &parent_project.language.extensions()) {
+            eprintln!("Unable to get unit's source files: {}", err.to_string());
+            process::exit(1);
         }
 
-        let mut output_dir = PathBuf::from(&parent_project.project_location);
-        output_dir.push(&self.output_directory);
-        fs::create_dir_all(&output_dir)?;
+        if source_file_paths.is_empty() {
+            return Err(Error::NoSourceFiles);
+        }
+
+        let output_dir = parent_project.project_location.join(&self.output_directory);
+        if let Err(err) = fs::create_dir_all(&output_dir) {
+            if err.kind() != io::ErrorKind::AlreadyExists {
+                eprintln!("Unable to create unit's output directory: {}", err.to_string());
+                process::exit(1);
+            }
+        }
 
         let mut output_file = output_dir.join(&self.name);
         match self.r#type {
             UnitType::Binary => {
-                if cfg!(target_os = "windows") {
+                if cfg!(windows) {
                     output_file.set_extension("exe");
                 }
             },
@@ -86,6 +89,26 @@ impl CopperUnit {
         }
         
         Ok(compile_options)
+    }
+
+    /// Recursively searches the directory for the source files by extension (according to the
+    /// language) and appends their paths to the vector of source file paths
+    fn get_source_files(&self, source_paths: &mut Vec<PathBuf>, dir_path: PathBuf, extensions: &Vec<OsString>) -> io::Result<()> {
+        for entry in fs::read_dir(&dir_path)? {
+            let path = entry?.path();
+
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if extensions.contains(&ext.to_os_string()) {
+                        source_paths.push(path);
+                    }
+                }
+            } else {
+                self.get_source_files(source_paths, path, extensions)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -127,7 +150,7 @@ impl TryFrom<String> for UnitType {
         match value.to_lowercase().as_str() {
             UnitType::BINARY_STR => Ok(UnitType::Binary),
             UnitType::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),
-            _ => Err(Error::EnumParseError(format!("Unexpected unit type value: {}", value)))
+            _ => Err(Error::InvalidUnitType(value)),
         }
     }
 }
