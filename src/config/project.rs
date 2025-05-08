@@ -24,7 +24,7 @@ pub struct CopperProject {
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
     /// Default build directory for all new units
-    #[serde(default = "default::BUILD_DIRECTORY")]
+    #[serde(default = "default::BUILD_DIRECTORY_PATH")]
     #[serde(skip_serializing)]
     default_build_directory: PathBuf,
     /// Location of the Copper project relative to where the command was executed.
@@ -47,7 +47,7 @@ impl CopperProject {
             compiler,
             global_include_paths,
             units,
-            default_build_directory: default::BUILD_DIRECTORY(),
+            default_build_directory: default::BUILD_DIRECTORY_PATH(),
             project_location
         }
     }

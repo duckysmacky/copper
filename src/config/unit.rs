@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::{fs, io, process};
 use crate::compiler::CompileOptions;
 use crate::config::project::CopperProject;
-use super::{Error, Result};
+use super::{default, equals, Error, Result};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,12 +15,18 @@ pub struct CopperUnit {
     /// Type of the unit
     r#type: UnitType,
     /// Location of the unit within the project
+    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
+    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
     source: PathBuf,
     /// Pre-unit additional include paths
     include_paths: Option<Vec<PathBuf>>,
     /// Per-unit build output location
+    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
+    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
     output_directory: PathBuf,
     /// Per-unit location for intermediate files
+    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
+    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
     intermediate_directory: PathBuf,
 }
 

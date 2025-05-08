@@ -42,6 +42,15 @@ pub fn init(
                 process::exit(1);
             }
         }
+    } else {
+        units.push(CopperUnit::new(
+            project_name.clone(),
+            UnitType::Binary,
+            PathBuf::from("."),
+            None,
+            PathBuf::from("."),
+            PathBuf::from("."),
+        ));
     }
 
     let project = CopperProject::new(
