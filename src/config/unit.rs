@@ -16,6 +16,8 @@ pub struct CopperUnit {
     r#type: UnitType,
     /// Location of the unit within the project
     source: PathBuf,
+    /// Pre-unit additional include paths
+    include_paths: Option<Vec<PathBuf>>,
     /// Per-unit build output location
     output_directory: PathBuf,
     /// Per-unit location for intermediate files
@@ -27,6 +29,7 @@ impl CopperUnit {
         name: String,
         r#type: UnitType,
         source: PathBuf,
+        include_paths: Option<Vec<PathBuf>>,
         output_directory: PathBuf,
         intermediate_directory: PathBuf
     ) -> Self {
@@ -34,6 +37,7 @@ impl CopperUnit {
             name,
             r#type,
             source,
+            include_paths,
             output_directory,
             intermediate_directory
         }
@@ -81,10 +85,23 @@ impl CopperUnit {
             parent_project.project_location.join(&self.intermediate_directory),
         );
 
-        if let Some(include_paths) = &parent_project.include_paths {
-            let include_paths: Vec<PathBuf> = include_paths.iter()
+        let mut include_paths = Vec::new();
+
+        // Global
+        if let Some(paths) = &parent_project.global_include_paths {
+            paths.iter()
                 .map(|path| parent_project.project_location.join(path))
-                .collect();
+                .for_each(|path| include_paths.push(path));
+        }
+
+        // Unit
+        if let Some(paths) = &self.include_paths {
+            paths.iter()
+                .map(|path| parent_project.project_location.join(path))
+                .for_each(|path| include_paths.push(path));
+        }
+
+        if !include_paths.is_empty() {
             compile_options.include_paths(include_paths);
         }
         

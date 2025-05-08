@@ -18,8 +18,8 @@ pub struct CopperProject {
     pub language: ProjectLanguage,
     /// Chosen compiler for the project
     pub compiler: ProjectCompiler,
-    /// Additional include paths for the whole project
-    pub include_paths: Option<Vec<PathBuf>>,
+    /// Project-wide additional include paths
+    pub global_include_paths: Option<Vec<PathBuf>>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
@@ -37,7 +37,7 @@ impl CopperProject {
         name: String,
         language: ProjectLanguage,
         compiler: ProjectCompiler,
-        include_paths: Option<Vec<PathBuf>>,
+        global_include_paths: Option<Vec<PathBuf>>,
         units: Vec<CopperUnit>,
         project_location: PathBuf
     ) -> Self {
@@ -45,7 +45,7 @@ impl CopperProject {
             name,
             language,
             compiler,
-            include_paths,
+            global_include_paths,
             units,
             default_build_directory: default::BUILD_DIRECTORY(),
             project_location
@@ -101,6 +101,7 @@ impl CopperProject {
             unit_name,
             unit_type,
             unit_source,
+            None,
             self.default_build_directory.join(unit_type_directory),
             self.default_build_directory.join("obj/")
         ))
@@ -162,7 +163,7 @@ impl ProjectLanguage {
 impl TryFrom<String> for ProjectLanguage {
     type Error = Error;
 
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             Self::C_STR => Ok(ProjectLanguage::C),
             Self::CPP_STR => Ok(ProjectLanguage::CPP),
@@ -214,7 +215,7 @@ impl ProjectCompiler {
 impl TryFrom<String> for ProjectCompiler {
     type Error = Error;
     
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "gcc" => Ok(ProjectCompiler::GCC),
             "g++" => Ok(ProjectCompiler::GPP),

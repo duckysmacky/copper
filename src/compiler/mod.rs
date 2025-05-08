@@ -14,7 +14,7 @@ pub trait Compiler {
     fn link(&self) -> Result<(), impl CompilerError>;
 }
 
-/// A generic compiler error
+/// A trait representing that the error is a compiler-specific error
 pub trait CompilerError {
     /// Display the error in a pretty way
     fn display(&self) -> String;
@@ -150,7 +150,10 @@ impl<'a> CompilerCommandExecutor<'a> {
     /// Compile provided source file into an object file
     pub fn compile(&mut self, source_file: &Path, language: Option<&str>, include_paths: &Option<Vec<PathBuf>>) -> io::Result<()> {
         if !source_file.exists() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, format!("Source file {:?} does not exist", source_file)));
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound, 
+                format!("Source file '{}' does not exist", source_file.display())
+            ));
         }
 
         if let Some(language) = language {
@@ -162,7 +165,10 @@ impl<'a> CompilerCommandExecutor<'a> {
         if let Some(include_paths) = include_paths {
             for include_path in include_paths {
                 if !include_path.exists() {
-                    return Err(io::Error::new(io::ErrorKind::NotFound, format!("Include path {:?} does not exist", include_path)));
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound, 
+                        format!("Include path '{}' does not exist", include_path.display())
+                    ));
                 }
 
                 self.command
@@ -182,7 +188,10 @@ impl<'a> CompilerCommandExecutor<'a> {
     pub fn link(&mut self, object_files: &Vec<PathBuf>) -> io::Result<()> {
         for object_file in object_files {
             if !object_file.exists() {
-                return Err(io::Error::new(io::ErrorKind::NotFound, format!("Object file {:?} does not exist", object_file)));
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound, 
+                    format!("Object file '{}' does not exist", object_file.display())
+                ));
             }
         }
 
