@@ -13,13 +13,9 @@ pub struct CopperUnit {
     /// Name of the unit
     pub name: String,
     /// Type of the unit
-    r#type: UnitType,
-    /// Location of the unit within the project
-    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
-    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
+    pub r#type: UnitType,
+    /// Location of the unit within the project (source code files)
     source: PathBuf,
-    /// Pre-unit additional include paths
-    include_paths: Option<Vec<PathBuf>>,
     /// Per-unit build output location
     #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
     #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
@@ -28,6 +24,8 @@ pub struct CopperUnit {
     #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
     #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
     intermediate_directory: PathBuf,
+    /// Pre-unit additional include paths
+    include_paths: Option<Vec<PathBuf>>,
     /// Per-unit additional compiler arguments
     additional_compiler_args: Option<String>,
 }
@@ -37,18 +35,18 @@ impl CopperUnit {
         name: String,
         r#type: UnitType,
         source: PathBuf,
-        include_paths: Option<Vec<PathBuf>>,
         output_directory: PathBuf,
         intermediate_directory: PathBuf,
+        include_paths: Option<Vec<PathBuf>>,
         additional_compiler_args: Option<String>,
     ) -> Self {
         CopperUnit {
             name,
             r#type,
             source,
-            include_paths,
             output_directory,
             intermediate_directory,
+            include_paths,
             additional_compiler_args,
         }
     }

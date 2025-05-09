@@ -105,9 +105,9 @@ impl CopperProject {
             unit_name,
             unit_type,
             unit_source,
-            None,
             self.default_build_directory.join(unit_type_directory),
             self.default_build_directory.join("obj/"),
+            None,
             None,
         ))
     }
@@ -116,7 +116,7 @@ impl CopperProject {
     pub fn find_unit(&self, unit_name: &str) -> Option<&CopperUnit> {
         let unit = self.units.iter()
             .find(|u| &u.name == unit_name);
-        
+
         if let Some(unit) = unit {
             Some(&unit)
         } else {

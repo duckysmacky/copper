@@ -47,9 +47,9 @@ pub fn init(
             project_name.clone(),
             UnitType::Binary,
             PathBuf::from("."),
+            PathBuf::from("."),
+            PathBuf::from("."),
             None,
-            PathBuf::from("."),
-            PathBuf::from("."),
             None,
         ));
     }
@@ -99,9 +99,9 @@ fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, incl
         "example_app".to_string(),
         UnitType::Binary,
         unit_dir,
-        None,
         bin_dir,
         obj_dir,
+        None,
         None,
     ));
 
