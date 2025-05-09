@@ -28,6 +28,10 @@ fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Ite
         None => project.get_unit_names(),
         Some(names) => names.collect(),
     };
+    
+    if unit_names.is_empty() {
+        return Err(Error::NoUnits)
+    }
 
     for unit_name in unit_names {
         match project.find_unit(unit_name) {

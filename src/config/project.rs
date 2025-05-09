@@ -43,6 +43,7 @@ pub struct CopperProject {
     pub global_additional_compiler_args: Option<String>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     units: Vec<CopperUnit>,
 }
 
