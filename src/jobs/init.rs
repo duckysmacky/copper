@@ -54,12 +54,12 @@ pub fn init(
     }
 
     let project = CopperProject::new(
+        project_location.to_path_buf(),
         project_name,
         project_language,
         default_compiler,
         include_paths,
         units,
-        project_location.to_path_buf()
     );
 
     match project.save(project_location) {

@@ -5,50 +5,50 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
-use crate::config::{default, PROJECT_FILE_NAME};
 use crate::config::unit::{CopperUnit, UnitType};
 use crate::error::Error;
+use super::{default, equals, PROJECT_FILE_NAME};
 
 /// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CopperProject {
+    /// Location of the Copper project relative to where the command was executed.
+    #[serde(skip)]
+    pub project_location: PathBuf,
     /// Name of the project
     name: String,
     /// Chosen language for the project
     pub language: ProjectLanguage,
     /// Chosen compiler for the project
     pub compiler: ProjectCompiler,
+    /// Default build directory for all new units
+    #[serde(default = "default::BUILD_DIRECTORY_PATH")]
+    #[serde(skip_serializing_if = "equals::BUILD_DIRECTORY_PATH")]
+    default_build_directory: PathBuf,
     /// Project-wide additional include paths
     pub global_include_paths: Option<Vec<PathBuf>>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
-    /// Default build directory for all new units
-    #[serde(default = "default::BUILD_DIRECTORY_PATH")]
-    #[serde(skip_serializing)]
-    default_build_directory: PathBuf,
-    /// Location of the Copper project relative to where the command was executed.
-    #[serde(skip)]
-    pub project_location: PathBuf
 }
 
 impl CopperProject {
     pub fn new(
+        project_location: PathBuf,
         name: String,
         language: ProjectLanguage,
         compiler: ProjectCompiler,
         global_include_paths: Option<Vec<PathBuf>>,
         units: Vec<CopperUnit>,
-        project_location: PathBuf
     ) -> Self {
         CopperProject {
+            project_location,
             name,
             language,
             compiler,
+            default_build_directory: default::BUILD_DIRECTORY_PATH(),
             global_include_paths,
             units,
-            default_build_directory: default::BUILD_DIRECTORY_PATH(),
-            project_location
         }
     }
 

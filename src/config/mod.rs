@@ -22,7 +22,8 @@ mod equals {
     /// Shortcut for generating callable closures which compare a values with a default value
     type Eq<T> = fn(&T) -> bool;
 
-    pub const LOCAL_DIRECTORY_PATH: Eq<PathBuf> = |path: &PathBuf| path.eq(&default::LOCAL_DIRECTORY_PATH());
+    pub const BUILD_DIRECTORY_PATH: Eq<PathBuf> = |path| path.eq(&default::BUILD_DIRECTORY_PATH());
+    pub const LOCAL_DIRECTORY_PATH: Eq<PathBuf> = |path| path.eq(&default::LOCAL_DIRECTORY_PATH());
 }
 
 pub const PROJECT_FILE_NAME: &str = "copper.toml";
