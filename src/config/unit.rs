@@ -28,6 +28,8 @@ pub struct CopperUnit {
     #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
     #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
     intermediate_directory: PathBuf,
+    /// Per-unit additional compiler arguments
+    additional_compiler_args: Option<String>,
 }
 
 impl CopperUnit {
@@ -37,7 +39,8 @@ impl CopperUnit {
         source: PathBuf,
         include_paths: Option<Vec<PathBuf>>,
         output_directory: PathBuf,
-        intermediate_directory: PathBuf
+        intermediate_directory: PathBuf,
+        additional_compiler_args: Option<String>,
     ) -> Self {
         CopperUnit {
             name,
@@ -45,7 +48,8 @@ impl CopperUnit {
             source,
             include_paths,
             output_directory,
-            intermediate_directory
+            intermediate_directory,
+            additional_compiler_args,
         }
     }
 

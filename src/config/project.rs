@@ -27,6 +27,8 @@ pub struct CopperProject {
     default_build_directory: PathBuf,
     /// Project-wide additional include paths
     pub global_include_paths: Option<Vec<PathBuf>>,
+    /// Project-wide additional compiler arguments
+    pub global_additional_compiler_args: Option<String>,
     /// Unit configuration data
     #[serde(rename = "Unit")]
     units: Vec<CopperUnit>,
@@ -39,6 +41,7 @@ impl CopperProject {
         language: ProjectLanguage,
         compiler: ProjectCompiler,
         global_include_paths: Option<Vec<PathBuf>>,
+        global_compiler_args: Option<String>,
         units: Vec<CopperUnit>,
     ) -> Self {
         CopperProject {
@@ -48,6 +51,7 @@ impl CopperProject {
             compiler,
             default_build_directory: default::BUILD_DIRECTORY_PATH(),
             global_include_paths,
+            global_additional_compiler_args: global_compiler_args,
             units,
         }
     }
@@ -103,7 +107,8 @@ impl CopperProject {
             unit_source,
             None,
             self.default_build_directory.join(unit_type_directory),
-            self.default_build_directory.join("obj/")
+            self.default_build_directory.join("obj/"),
+            None,
         ))
     }
 

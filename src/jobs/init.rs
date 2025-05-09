@@ -50,6 +50,7 @@ pub fn init(
             None,
             PathBuf::from("."),
             PathBuf::from("."),
+            None,
         ));
     }
 
@@ -59,6 +60,7 @@ pub fn init(
         project_language,
         default_compiler,
         include_paths,
+        None,
         units,
     );
 
@@ -100,6 +102,7 @@ fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, incl
         None,
         bin_dir,
         obj_dir,
+        None,
     ));
 
     Ok(())
