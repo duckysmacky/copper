@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::{fs, io, process};
 use crate::compiler::CompileOptions;
 use crate::config::project::CopperProject;
-use super::{default, equals, Error, Result};
+use super::{Error, Result};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,14 +16,12 @@ pub struct CopperUnit {
     pub r#type: UnitType,
     /// Location of the unit within the project (source code files)
     source: PathBuf,
-    /// Per-unit build output location
-    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
-    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
-    output_directory: PathBuf,
-    /// Per-unit location for intermediate files
-    #[serde(default = "default::LOCAL_DIRECTORY_PATH")]
-    #[serde(skip_serializing_if = "equals::LOCAL_DIRECTORY_PATH")]
-    intermediate_directory: PathBuf,
+    /// Unit's build output location. Will convert `None` into a path generated from the
+    /// default project path
+    output_directory: Option<PathBuf>,
+    /// Unit's intermediate files location. Will convert `None` into a path generated from the
+    /// default project path
+    intermediate_directory: Option<PathBuf>,
     /// Pre-unit additional include paths
     include_paths: Option<Vec<PathBuf>>,
     /// Per-unit additional compiler arguments
@@ -44,13 +42,13 @@ impl CopperUnit {
             name,
             r#type,
             source,
-            output_directory,
-            intermediate_directory,
+            output_directory: Some(output_directory),
+            intermediate_directory: Some(intermediate_directory),
             include_paths,
             additional_compiler_args,
         }
     }
-
+    
     /// Collects needed information about the unit and builds it according to its type and selected
     /// project compiler and returns compile options for later usage with a compiler
     pub fn get_compile_options(&self, parent_project: &CopperProject) -> Result<CompileOptions> {
@@ -66,15 +64,32 @@ impl CopperUnit {
             return Err(Error::NoSourceFiles);
         }
 
-        let output_dir = parent_project.project_location.join(&self.output_directory);
-        if let Err(err) = fs::create_dir_all(&output_dir) {
+        // Output and intermediate directories should be passed as relative to where the project is
+        // located
+        let output_directory = {
+            let dir = match &self.output_directory {
+                Some(dir) => dir,
+                None => &self.generate_output_directory(parent_project),
+            };
+            parent_project.project_location.join(dir)
+        };
+        
+        let intermediate_directory = {
+            let dir = match &self.intermediate_directory {
+                Some(dir) => dir,
+                None => &self.generate_intermediate_directory(parent_project)
+            };
+            parent_project.project_location.join(dir)
+        };
+        
+        if let Err(err) = fs::create_dir_all(&output_directory) {
             if err.kind() != io::ErrorKind::AlreadyExists {
                 eprintln!("Unable to create unit's output directory: {}", err.to_string());
                 process::exit(1);
             }
         }
 
-        let mut output_file = output_dir.join(&self.name);
+        let mut output_file = output_directory.join(&self.name);
         match self.r#type {
             UnitType::Binary => {
                 if cfg!(windows) {
@@ -89,8 +104,8 @@ impl CopperUnit {
             self.r#type.clone(),
             parent_project.language.clone(),
             source_file_paths,
-            parent_project.project_location.join(&self.output_directory),
-            parent_project.project_location.join(&self.intermediate_directory),
+            output_directory,
+            intermediate_directory,
         );
 
         let mut include_paths = Vec::new();
@@ -134,6 +149,21 @@ impl CopperUnit {
         }
 
         Ok(())
+    }
+
+    /// Generates an output directory based on the project's defaults and self's type
+    fn generate_output_directory(&self, parent_project: &CopperProject) -> PathBuf {
+        let build_dir = &parent_project.default_build_directory;
+
+        match self.r#type {
+            UnitType::Binary => build_dir.join(&parent_project.default_binary_directory),
+            UnitType::StaticLibrary => build_dir.join(&parent_project.default_library_directory)
+        }
+    }
+
+    /// Generates an intermediate directory based on the project's defaults
+    fn generate_intermediate_directory(&self, parent_project: &CopperProject) -> PathBuf {
+        parent_project.default_build_directory.join(&parent_project.default_object_directory)
     }
 }
 

@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
+use crate::config;
 use crate::config::{
     project::{CopperProject, ProjectLanguage, ProjectCompiler},
     unit::{CopperUnit, UnitType}
@@ -42,16 +43,6 @@ pub fn init(
                 process::exit(1);
             }
         }
-    } else {
-        units.push(CopperUnit::new(
-            project_name.clone(),
-            UnitType::Binary,
-            PathBuf::from("."),
-            PathBuf::from("."),
-            PathBuf::from("."),
-            None,
-            None,
-        ));
     }
 
     let project = CopperProject::new(
@@ -79,13 +70,15 @@ pub fn init(
 /// Generates an example project configuration. Creates default directories and appends example
 /// unit and include path to project data
 fn add_example_config(project_location: &Path, units: &mut Vec<CopperUnit>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
-    let src_dir = Path::new("src");
-    let build_dir = Path::new("build");
+    use config::default;
+    
+    let src_dir = default::SOURCE_DIRECTORY();
+    let build_dir = default::BUILD_DIRECTORY();
 
     let unit_dir = src_dir.join("app");
     let include_dir = src_dir.join("include");
-    let bin_dir = build_dir.join("bin");
-    let obj_dir = build_dir.join("obj");
+    let bin_dir = build_dir.join(default::BINARY_DIRECTORY());
+    let obj_dir = build_dir.join(default::OBJECT_DIRECTORY());
 
     /// Skip the error if it is an 'already exists' error (since it is not critical in this case)
     fn skip_already_exists(err: io::Error) -> io::Result<()> { if err.kind() == io::ErrorKind::AlreadyExists { Ok(()) } else { Err(err) } }

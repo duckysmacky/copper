@@ -21,10 +21,22 @@ pub struct CopperProject {
     pub language: ProjectLanguage,
     /// Chosen compiler for the project
     pub compiler: ProjectCompiler,
-    /// Default build directory for all new units
-    #[serde(default = "default::BUILD_DIRECTORY_PATH")]
-    #[serde(skip_serializing_if = "equals::BUILD_DIRECTORY_PATH")]
-    default_build_directory: PathBuf,
+    /// Default build directory path for all units
+    #[serde(default = "default::BUILD_DIRECTORY")]
+    #[serde(skip_serializing_if = "equals::BUILD_DIRECTORY")]
+    pub default_build_directory: PathBuf,
+    /// Default binary directory path for all units
+    #[serde(default = "default::BINARY_DIRECTORY")]
+    #[serde(skip_serializing_if = "equals::BINARY_DIRECTORY")]
+    pub default_binary_directory: PathBuf,
+    /// Default library directory path for all units
+    #[serde(default = "default::LIBRARY_DIRECTORY")]
+    #[serde(skip_serializing_if = "equals::LIBRARY_DIRECTORY")]
+    pub default_library_directory: PathBuf,
+    /// Default object files directory path for all units
+    #[serde(default = "default::OBJECT_DIRECTORY")]
+    #[serde(skip_serializing_if = "equals::OBJECT_DIRECTORY")]
+    pub default_object_directory: PathBuf,
     /// Project-wide additional include paths
     pub global_include_paths: Option<Vec<PathBuf>>,
     /// Project-wide additional compiler arguments
@@ -49,7 +61,10 @@ impl CopperProject {
             name,
             language,
             compiler,
-            default_build_directory: default::BUILD_DIRECTORY_PATH(),
+            default_build_directory: default::BUILD_DIRECTORY(),
+            default_binary_directory: default::BINARY_DIRECTORY(),
+            default_library_directory: default::LIBRARY_DIRECTORY(),
+            default_object_directory: default::OBJECT_DIRECTORY(),
             global_include_paths,
             global_additional_compiler_args: global_compiler_args,
             units,
@@ -97,8 +112,8 @@ impl CopperProject {
     /// Creates a new unit with minimum configuration and adds it to the project
     pub fn add_unit(&mut self, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
         let unit_type_directory = match &unit_type {
-            UnitType::Binary => "bin/",
-            UnitType::StaticLibrary => "lib/"
+            UnitType::Binary => &self.default_binary_directory,
+            UnitType::StaticLibrary => &self.default_library_directory,
         };
 
         self.units.push(CopperUnit::new(
@@ -106,7 +121,7 @@ impl CopperProject {
             unit_type,
             unit_source,
             self.default_build_directory.join(unit_type_directory),
-            self.default_build_directory.join("obj/"),
+            self.default_build_directory.join(&self.default_object_directory),
             None,
             None,
         ))
