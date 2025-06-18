@@ -1,0 +1,11 @@
+name = 'example'
+language = 'c'
+compiler = 'gcc'
+global-include-paths = ['src\include']
+
+[[Unit]]
+name = 'app'
+type = 'binary'
+source = 'src\app'
+output-directory = 'build\bin'
+intermediate-directory = 'build\obj'
