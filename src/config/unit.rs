@@ -95,7 +95,7 @@ impl UnitConfig {
                     output_file.set_extension("exe");
                 }
             },
-            UnitType::StaticLibrary => todo!()
+            _ => unimplemented!()
         }
 
         let mut compile_options = CompileOptions::new(
@@ -156,7 +156,7 @@ impl UnitConfig {
 
         match self.r#type {
             UnitType::Binary => build_dir.join(&parent_project.default_binary_directory),
-            UnitType::StaticLibrary => build_dir.join(&parent_project.default_library_directory)
+            UnitType::StaticLibrary | UnitType::DynamicLibrary => build_dir.join(&parent_project.default_library_directory)
         }
     }
 
@@ -171,29 +171,28 @@ impl UnitConfig {
 #[serde(try_from = "String", into = "String")]
 pub enum UnitType {
     Binary,
-    StaticLibrary
+    StaticLibrary,
+    DynamicLibrary,
 }
 
 impl UnitType {
     const BINARY_STR: &'static str = "binary";
     const STATIC_LIBRARY_STR: &'static str = "static-library";
+    const DYNAMIC_LIBRARY_STR: &'static str = "dynamic-library";
 
     /// Returns an array of possible unit type variants as stings
-    pub fn get_strings() -> [&'static str; 2] {
-        [
-            Self::BINARY_STR,
-            Self::STATIC_LIBRARY_STR
-        ]
+    pub fn str_variants() -> [&'static str; 3] {
+        [Self::BINARY_STR, Self::STATIC_LIBRARY_STR, Self::DYNAMIC_LIBRARY_STR]
     }
 }
 
 impl Display for UnitType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            UnitType::Binary => UnitType::BINARY_STR.to_string(),
-            UnitType::StaticLibrary => UnitType::STATIC_LIBRARY_STR.to_string()
-        };
-        write!(f, "{}", str)
+        write!(f, "{}", match self {
+            UnitType::Binary => Self::BINARY_STR,
+            UnitType::StaticLibrary => Self::STATIC_LIBRARY_STR,
+            UnitType::DynamicLibrary => Self::DYNAMIC_LIBRARY_STR,
+        })
     }
 }
 
@@ -202,8 +201,9 @@ impl TryFrom<String> for UnitType {
     
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
-            UnitType::BINARY_STR => Ok(UnitType::Binary),
-            UnitType::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),
+            Self::BINARY_STR | "bin" => Ok(UnitType::Binary),
+            Self::STATIC_LIBRARY_STR | "static-lib" => Ok(UnitType::StaticLibrary),
+            Self::DYNAMIC_LIBRARY_STR | "dynamic-lib" => Ok(UnitType::DynamicLibrary),
             _ => Err(Error::InvalidUnitType(value)),
         }
     }
@@ -212,8 +212,9 @@ impl TryFrom<String> for UnitType {
 impl Into<String> for UnitType {
     fn into(self) -> String {
         match self {
-            UnitType::Binary => UnitType::BINARY_STR.to_string(),
-            UnitType::StaticLibrary => UnitType::STATIC_LIBRARY_STR.to_string()
+            UnitType::Binary => Self::BINARY_STR.to_string(),
+            UnitType::StaticLibrary => Self::STATIC_LIBRARY_STR.to_string(),
+            UnitType::DynamicLibrary => Self::DYNAMIC_LIBRARY_STR.to_string(),
         }
     }
 }

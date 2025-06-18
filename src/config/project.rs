@@ -110,7 +110,7 @@ impl ProjectConfig {
     pub fn add_unit(&mut self, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
         let unit_type_directory = match &unit_type {
             UnitType::Binary => &self.default_binary_directory,
-            UnitType::StaticLibrary => &self.default_library_directory,
+            UnitType::StaticLibrary | UnitType::DynamicLibrary => &self.default_library_directory,
         };
 
         self.units.push(UnitConfig::new(

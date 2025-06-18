@@ -9,13 +9,13 @@ use crate::config::ProjectCompiler;
 /// compiler executable in $PATH).
 pub fn check_if_available(compiler: &ProjectCompiler) -> bool {
     match compiler {
-        ProjectCompiler::GCC => find_executable(compiler.get_executable()).is_some(),
-        ProjectCompiler::GPP => find_executable(compiler.get_executable()).is_some(),
-        ProjectCompiler::CLANG => find_executable(compiler.get_executable()).is_some(),
+        ProjectCompiler::GCC => find_executable(compiler.executable_name()).is_some(),
+        ProjectCompiler::GPP => find_executable(compiler.executable_name()).is_some(),
+        ProjectCompiler::CLANG => find_executable(compiler.executable_name()).is_some(),
         ProjectCompiler::MSVC => {
             if !cfg!(windows) { return false; }
 
-            if let None = find_executable(compiler.get_executable()) {
+            if let None = find_executable(compiler.executable_name()) {
                 return false;
             }
 
