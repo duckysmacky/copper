@@ -12,7 +12,16 @@ pub enum ProjectCompiler {
 }
 
 impl ProjectCompiler {
-    pub fn get_executable(&self) -> String {
+    const GCC_STR: &'static str = "gcc";
+    const GPP_STR: &'static str = "g++";
+    const CLANG_STR: &'static str = "clang";
+    const MSVC_STR: &'static str = "msvc";
+    
+    pub fn str_variants() -> [&'static str; 4] {
+        [Self::GCC_STR, Self::GPP_STR, Self::CLANG_STR, Self::MSVC_STR]
+    }
+    
+    pub fn executable_name(&self) -> String {
         match self {
             ProjectCompiler::GCC => "gcc".to_string(),
             ProjectCompiler::GPP => "g++".to_string(),
@@ -26,11 +35,11 @@ impl TryFrom<String> for ProjectCompiler {
     type Error = Error;
     
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.to_lowercase().as_str() {
-            "gcc" => Ok(ProjectCompiler::GCC),
-            "g++" => Ok(ProjectCompiler::GPP),
-            "clang" => Ok(ProjectCompiler::CLANG),
-            "msvc" => Ok(ProjectCompiler::MSVC),
+        match value.to_lowercase().trim() {
+            Self::GCC_STR => Ok(ProjectCompiler::GCC),
+            Self::GPP_STR | "gpp" => Ok(ProjectCompiler::GPP),
+            Self::CLANG_STR => Ok(ProjectCompiler::CLANG),
+            Self::MSVC_STR | "cl" => Ok(ProjectCompiler::MSVC),
             _ => Err(Error::EnumParseError(format!("Unexpected compiler value: {}", value)))
         }
     }
@@ -39,10 +48,10 @@ impl TryFrom<String> for ProjectCompiler {
 impl Into<String> for ProjectCompiler {
     fn into(self) -> String {
         match self {
-            ProjectCompiler::GCC => "gcc".to_string(),
-            ProjectCompiler::GPP => "g++".to_string(),
-            ProjectCompiler::CLANG => "clang".to_string(),
-            ProjectCompiler::MSVC => "msvc".to_string()
+            ProjectCompiler::GCC => Self::GCC_STR.to_string(),
+            ProjectCompiler::GPP => Self::GPP_STR.to_string(),
+            ProjectCompiler::CLANG => Self::CLANG_STR.to_string(),
+            ProjectCompiler::MSVC => Self::MSVC_STR.to_string()
         }
     }
 }
