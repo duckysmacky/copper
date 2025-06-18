@@ -18,11 +18,8 @@ impl ProjectLanguage {
     const CPP_EXTENSIONS: [&'static str; 2] = ["c", "cpp"];
 
     /// Returns an array of possible unit type variants as stings
-    pub fn get_strings() -> [&'static str; 2] {
-        [
-            Self::C_STR,
-            Self::CPP_STR
-        ]
+    pub fn str_variants() -> [&'static str; 2] {
+        [Self::C_STR, Self::CPP_STR]
     }
 
     /// Returns a vector containing possible source file extensions for the specific language
@@ -40,7 +37,7 @@ impl TryFrom<String> for ProjectLanguage {
     type Error = Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.to_lowercase().as_str() {
+        match value.to_lowercase().trim() {
             Self::C_STR => Ok(ProjectLanguage::C),
             Self::CPP_STR => Ok(ProjectLanguage::CPP),
             _ => Err(Error::EnumParseError(format!("Unexpected language value: {}", value)))
