@@ -11,10 +11,7 @@ pub fn handle_init(matches: &ArgMatches) {
         ProjectLanguage::try_from(language_str.to_string()).unwrap()
     };
     
-    let project_location = {
-        let location = matches.get_one::<String>("location").unwrap();
-        Path::new(location)
-    };
+    let project_location = matches.get_one::<PathBuf>("location").unwrap();
 
     let project_name = match matches.get_one::<String>("name") {
         Some(name) => String::from(name),
@@ -39,30 +36,24 @@ pub fn handle_init(matches: &ArgMatches) {
 pub fn handle_build(matches: &ArgMatches) {
     let units = matches.get_many::<String>("units");
     
-    let project_location = {
-        let location = matches.get_one::<String>("location").unwrap();
-        Path::new(location)
-    };
+    let project_location = matches.get_one::<PathBuf>("location").unwrap();
 
     jobs::build(units, project_location);
 }
 
 pub fn handle_new(matches: &ArgMatches) {
-    let project_location = {
-        let location = matches.get_one::<String>("location").unwrap();
-        Path::new(location)
-    };
+    let project_location = matches.get_one::<PathBuf>("location").unwrap();
  
     if let Some(matches) = matches.subcommand_matches("unit") {
-        let unit_source = matches.get_one::<String>("source").unwrap();
-        let unit_path = PathBuf::from(unit_source);
-        let unit_name = Path::new(unit_source).file_name().unwrap().to_str().unwrap();
+        // TODO: add validation for existing unit directory
+        let unit_path = matches.get_one::<PathBuf>("source").unwrap();
+        let unit_name = unit_path.file_name().unwrap().to_str().unwrap();
         let unit_type = {
             let type_str = matches.get_one::<String>("type").unwrap();
             // Safe to unwrap as we already checked for valid enum strings
             UnitType::try_from(type_str.to_string()).unwrap()
         };
 
-        jobs::new::new_unit(project_location, unit_name, unit_type.clone(), unit_path);
+        jobs::new::new_unit(project_location, unit_name, unit_type.clone(), unit_path.clone());
     }
 }

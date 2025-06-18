@@ -1,3 +1,5 @@
+use clap::{CommandFactory, Parser};
+
 mod file;
 mod compiler;
 mod error;
@@ -6,6 +8,7 @@ mod config;
 mod jobs;
 
 fn main() {
-    let matches = cli::get_command().get_matches();
-    cli::match_args(matches);
+    let cli_command = cli::command::Cli::command();
+    
+    cli::match_args(cli_command.get_matches());
 }
