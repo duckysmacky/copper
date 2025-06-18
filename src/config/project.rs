@@ -7,6 +7,7 @@ use super::{default, equals, ProjectLanguage, ProjectCompiler, UnitConfig, UnitT
 
 /// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ProjectConfig {
     /// Location of the Copper project relative to where the command was executed.
     #[serde(skip)]

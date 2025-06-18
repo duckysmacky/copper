@@ -8,6 +8,7 @@ use super::{ProjectConfig, Error, Result};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
 pub struct UnitConfig {
     /// Name of the unit
     pub name: String,
