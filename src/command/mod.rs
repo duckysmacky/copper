@@ -21,7 +21,7 @@ pub fn get_command() -> Command {
             .arg(Arg::new("language")
                 .help("Specify the language of the project")
                 .long("lang")
-                .default_value("cpp")
+                .default_value("c++")
                 .value_parser(ProjectLanguage::str_variants())
             )
             .arg(Arg::new("compiler")
