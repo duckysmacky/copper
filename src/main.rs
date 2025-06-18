@@ -1,11 +1,11 @@
 mod file;
 mod compiler;
 mod error;
-mod command;
+mod cli;
 mod config;
 mod jobs;
 
 fn main() {
-    let matches = command::get_command().get_matches();
-    command::match_args(matches);
+    let matches = cli::get_command().get_matches();
+    cli::match_args(matches);
 }
