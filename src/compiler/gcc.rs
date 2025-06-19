@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
-use crate::compiler::{CompileOptions, Compiler, CompilerError};
+use crate::compiler::CompileOptions;
 use crate::compiler::command::{CompilerCommand, CompilerCommandFlags};
 use crate::config::{ProjectLanguage, UnitType};
 use crate::error::parse_output;
@@ -18,17 +18,11 @@ mod constants {
 }
 
 /// GCC-specific error types
-enum Error {
+pub enum Error {
     /// Error related to the compilation of the source files
     CompileError(String),
     /// Error related to the linking of the object files
     LinkError(String),
-}
-
-impl CompilerError for Error {
-    fn display(&self) -> String {
-        format!("GCC Error - {}", self)
-    }
 }
 
 impl Display for Error {
@@ -41,7 +35,7 @@ impl Display for Error {
 }
 
 /// Options for the GCC compiler
-pub struct GCCCompiler {
+pub struct Compiler {
     command: CompilerCommand,
     target_name: String,
     #[allow(dead_code)]
@@ -53,7 +47,7 @@ pub struct GCCCompiler {
     include_paths: Option<Vec<PathBuf>>
 }
 
-impl From<CompileOptions> for GCCCompiler {
+impl From<CompileOptions> for Compiler {
     /// Creates a new GCC Compiler from general compile options
     fn from(options: CompileOptions) -> Self {
         let compiler_flags = CompilerCommandFlags::new(
@@ -63,7 +57,7 @@ impl From<CompileOptions> for GCCCompiler {
             constants::flags::LANGUAGE
         );
 
-        GCCCompiler {
+        Compiler {
             command: CompilerCommand::new(constants::COMPILER_EXECUTABLE_NAME, compiler_flags),
             target_name: options.target_name,
             target_type: options.target_type,
@@ -76,9 +70,9 @@ impl From<CompileOptions> for GCCCompiler {
     }
 }
 
-impl Compiler for GCCCompiler {
+impl Compiler {
     /// Compiles source files into object files
-    fn compile(&self) -> std::result::Result<(), impl CompilerError> {
+    pub fn compile(&self) -> Result<(), Error> {
         for source_file in &self.source_files {
             let mut output_file = self.intermediate_directory.join(source_file.file_name().unwrap());
             output_file.set_extension("o");
@@ -100,7 +94,7 @@ impl Compiler for GCCCompiler {
     }
 
     /// Links compiled object files to the output file
-    fn link(&self) -> std::result::Result<(), impl CompilerError> {
+    pub fn link(&self) -> Result<(), Error> {
         let mut object_files = self.source_files.iter()
             .map(|source_file| self.intermediate_directory.join(source_file.file_name().unwrap()))
             .collect::<Vec<PathBuf>>();

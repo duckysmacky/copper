@@ -6,17 +6,49 @@ mod gcc;
 mod util;
 mod command;
 
-/// Compiler trait to generically refer to
-pub trait Compiler {
-    /// Builds the unit with the provided Compile Options using the selected compiler
-    fn compile(&self) -> Result<(), impl CompilerError>;
-    fn link(&self) -> Result<(), impl CompilerError>;
+/// An instance of a specific compiler which is responsible for building, compiling and linking
+/// project files
+pub enum Compiler {
+    GCC(gcc::Compiler),
 }
 
-/// A trait representing that the error is a compiler-specific error
-pub trait CompilerError {
-    /// Display the error in a pretty way
-    fn display(&self) -> String;
+impl Compiler {
+    /// Returns a specific compiler instance based on the selected project compiler
+    pub fn initialize(project_compiler: &ProjectCompiler, options: CompileOptions) -> Self {
+        if !util::check_if_available(project_compiler) {
+            eprintln!("Unsupported compiler specified (Not available on the current system)");
+            process::exit(1);
+        }
+
+        match project_compiler {
+            ProjectCompiler::GCC => Self::GCC(gcc::Compiler::from(options)),
+            _ => unimplemented!()
+        }
+    }
+    
+    pub fn compile(&self) -> Result<(), String> { 
+        match self {
+           Self::GCC(compiler) => {
+               if let Err(err) = compiler.compile() {
+                   return Err(format!("GCC Error - {}", err))
+               }
+           }
+        }
+        
+        Ok(())
+    }
+
+    pub fn link(&self) -> Result<(), String> {
+        match self {
+            Self::GCC(compiler) => {
+                if let Err(err) = compiler.link() {
+                    return Err(format!("GCC Error - {}", err))
+                }
+            }
+        }
+        
+        Ok(())
+    }
 }
 
 /// General compile options
@@ -52,18 +84,5 @@ impl CompileOptions {
     
     pub fn include_paths(&mut self, include_paths: Vec<PathBuf>) {
         self.include_paths = Some(include_paths);
-    }
-}
-
-/// Returns a specific Compiler based on the chosen project compiler
-pub fn get_compiler(compiler: &ProjectCompiler, options: CompileOptions) -> impl Compiler {
-    if !util::check_if_available(compiler) {
-        eprintln!("Unsupported compiler specified (Not available on the current system)");
-        process::exit(1);
-    }
-    
-    match compiler {
-        ProjectCompiler::GCC => gcc::GCCCompiler::from(options),
-        _ => unimplemented!()
     }
 }

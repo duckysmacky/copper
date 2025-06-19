@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::process;
-use crate::compiler::{self, Compiler, CompilerError};
+use crate::compiler;
 use crate::config::{ProjectConfig, UnitConfig, Error, Result};
 
 pub fn build<'a>(units: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
@@ -53,12 +53,12 @@ fn build_unit(project: &ProjectConfig, unit: &UnitConfig) {
         }
     };
 
-    let compiler = compiler::get_compiler(&project.compiler, compile_options);
+    let compiler = compiler::Compiler::initialize(&project.compiler, compile_options);
 
     match compiler.compile() {
         Ok(_) => println!("Successfully compiled '{}'", unit.name),
         Err(err) => {
-            eprintln!("Error compiling '{}':\n{}", unit.name, err.display());
+            eprintln!("Error compiling '{}':\n{}", unit.name, err);
             process::exit(1);
         }
     }
@@ -66,7 +66,7 @@ fn build_unit(project: &ProjectConfig, unit: &UnitConfig) {
     match compiler.link() {
         Ok(_) => println!("Successfully linked '{}'", unit.name),
         Err(err) => {
-            eprintln!("Error linking '{}':\n{}", unit.name, err.display());
+            eprintln!("Error linking '{}':\n{}", unit.name, err);
             process::exit(1);
         }
     }
