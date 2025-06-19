@@ -1,4 +1,4 @@
-use clap::{CommandFactory, Parser};
+use clap::CommandFactory;
 
 mod file;
 mod compiler;

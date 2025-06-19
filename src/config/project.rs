@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use crate::compiler::CompilerOptions;
 use super::{default, equals, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
 
 /// Main Copper project configuration file
@@ -142,5 +143,14 @@ impl ProjectConfig {
         self.units.iter()
         .map(|unit| &unit.name)
         .collect()
+    }
+    
+    pub fn get_compiler_options(&self) -> CompilerOptions {
+        CompilerOptions::new(
+            self.project_location.clone(),
+            self.language.clone(),
+            self.global_include_paths.clone(),
+            self.global_additional_compiler_args.clone(),
+        )
     }
 }

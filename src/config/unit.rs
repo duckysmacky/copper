@@ -1,10 +1,10 @@
 use std::ffi::OsString;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs, io, process};
 use serde::{Deserialize, Serialize};
-use crate::compiler::CompileOptions;
-use super::{ProjectConfig, Error, Result};
+use crate::compiler::TargetInformation;
+use super::{ProjectConfig, Error};
 
 /// Configuration for the project unit
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -49,19 +49,20 @@ impl UnitConfig {
         }
     }
     
-    /// Collects needed information about the unit and builds it according to its type and selected
-    /// project compiler and returns compile options for later usage with a compiler
-    pub fn get_compile_options(&self, parent_project: &ProjectConfig) -> Result<CompileOptions> {
+    /// Collects needed information about the unit and returns target information for later usage
+    /// with a compiler
+    pub fn get_target_information(&self, parent_project: &ProjectConfig) -> Option<TargetInformation> {
         let unit_path = parent_project.project_location.join(&self.source);
-
+        
         let mut source_file_paths = Vec::new();
-        if let Err(err) =  self.get_source_files(&mut source_file_paths, unit_path, &parent_project.language.extensions()) {
+        if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &parent_project.language.extensions()) {
             eprintln!("Unable to get unit's source files: {}", err.to_string());
             process::exit(1);
         }
 
         if source_file_paths.is_empty() {
-            return Err(Error::NoSourceFiles);
+            eprintln!("There are no source files to build");
+            return None;
         }
 
         // Output and intermediate directories should be passed as relative to where the project is
@@ -99,36 +100,16 @@ impl UnitConfig {
             _ => unimplemented!()
         }
 
-        let mut compile_options = CompileOptions::new(
+        
+        Some(TargetInformation::new(
             self.name.clone(),
             self.r#type.clone(),
-            parent_project.language.clone(),
             source_file_paths,
             output_directory,
             intermediate_directory,
-        );
-
-        let mut include_paths = Vec::new();
-
-        // Global
-        if let Some(paths) = &parent_project.global_include_paths {
-            paths.iter()
-                .map(|path| parent_project.project_location.join(path))
-                .for_each(|path| include_paths.push(path));
-        }
-
-        // Unit
-        if let Some(paths) = &self.include_paths {
-            paths.iter()
-                .map(|path| parent_project.project_location.join(path))
-                .for_each(|path| include_paths.push(path));
-        }
-
-        if !include_paths.is_empty() {
-            compile_options.include_paths(include_paths);
-        }
-        
-        Ok(compile_options)
+            self.include_paths.clone(),
+            self.additional_compiler_args.clone(),
+        ))
     }
 
     /// Recursively searches the directory for the source files by extension (according to the
@@ -200,7 +181,7 @@ impl Display for UnitType {
 impl TryFrom<String> for UnitType {
     type Error = Error;
     
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             Self::BINARY_STR | "bin" => Ok(UnitType::Binary),
             Self::STATIC_LIBRARY_STR | "static-lib" => Ok(UnitType::StaticLibrary),

@@ -16,8 +16,6 @@ pub enum Error {
     InvalidCompiler(String),
     /// The specified unit type doesn't exist
     InvalidUnitType(String),
-    /// There are no source files to be found
-    NoSourceFiles,
     /// There are no units to build
     NoUnits,
 }
@@ -30,7 +28,6 @@ impl fmt::Display for Error {
             Error::InvalidLanguage(s) => write!(f, "Invalid language value provided ('{}')", s),
             Error::InvalidCompiler(s) => write!(f, "Invalid compiler value provided ('{}')", s),
             Error::InvalidUnitType(s) => write!(f, "Invalid unit type value provided ('{}')", s),
-            Error::NoSourceFiles => write!(f, "There are no source files to build"),
             Error::NoUnits => write!(f, "There are no units to build"),
         }
     }
