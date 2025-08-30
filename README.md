@@ -1,7 +1,7 @@
 # Copper - C/C++ build tool
 
 Copper is an easily configurable build tool for C/C++ projects. It aims to work with most of the popular compilers 
-(gcc, clang, msvc) while allowing quick and easy configuration for your project using a single `copper.toml` file.
+(gcc, clang, msvc) while allowing quick and easy configuration for your project using a single `copper.yaml` file.
 
 > [!NOTE]
 > Right now Copper is in a very early stage of development. Many of the described features might and will change in the 
@@ -18,7 +18,7 @@ of your C and C++ projects without manually writing compile, link and build logi
 links them together according to the configuration, while also having options for additional parameters. Each Copper 
 Project is made of smaller Copper Units which contain module-specific configuration and build rules.
 
-**Please refer to the [Project Configuration File Reference](https://github.com/duckysmacky/copper/wiki/Project-Configuration#coppertoml-reference) 
+**Please refer to the [Project Configuration File Reference](https://github.com/duckysmacky/copper/wiki/Project-Configuration#coppe.yaml-reference) 
 in order to learn how to properly configure your Copper project**
 
 ## Installation
@@ -32,7 +32,7 @@ cargo install --git https://github.com/duckysmacky/copper.git
 
 ## Usage
 
-Copper works by reading project configuration defined in a `copper.toml` file. It should contain all the necessary 
+Copper works by reading project configuration defined in a `copper.yaml` file. It should contain all the necessary 
 information about source language, chosen compiler, additional flags, copper units, target directories, include paths, 
 etc.
 
@@ -54,7 +54,7 @@ also generate a basic example configuration to get easily started with (can be c
 copper new unit <source> <type>
 ```
 
-This will add the specified `source` path as a Unit to the `copper.toml` file. `source` should a valid path to a 
+This will add the specified `source` path as a Unit to the `copper.yaml` file. `source` should a valid path to a 
 directory containing source files, where all the files within are to be compiled and linked separately from the other 
 Units. `type` is used to specify the output file type (this can be a `binary`, `static-library` or `dynamic-library`)
 
@@ -65,4 +65,4 @@ copper build [unit]...
 ```
 
 Build the whole project or only specified unit names. Will output binary, object and library files into directories 
-specified in `copper.toml`.
+specified in `copper.yaml`.

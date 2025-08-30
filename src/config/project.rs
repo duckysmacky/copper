@@ -36,11 +36,12 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "equals::OBJECT_DIRECTORY")]
     pub default_object_directory: PathBuf,
     /// Project-wide additional include paths
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub global_include_paths: Option<Vec<PathBuf>>,
     /// Project-wide additional compiler arguments
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub global_additional_compiler_args: Option<String>,
     /// Unit configuration data
-    #[serde(rename = "Unit")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     units: Vec<UnitConfig>,
 }
@@ -70,7 +71,7 @@ impl ProjectConfig {
         }
     }
 
-    /// Imports a Copper project from a .toml project file
+    /// Imports a Copper project from a .yaml project file
     pub fn import(directory: &Path) -> io::Result<Self> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::open(file_path)?;
@@ -78,7 +79,7 @@ impl ProjectConfig {
         let mut file_data = String::new();
         file.read_to_string(&mut file_data)?;
 
-        let mut project: ProjectConfig = match toml::from_str(&file_data) {
+        let mut project: ProjectConfig = match serde_yaml::from_str(&file_data) {
             Ok(project) => project,
             Err(err) => {
                 eprintln!("Unable to deserialize project: {}", err);
@@ -90,20 +91,21 @@ impl ProjectConfig {
         Ok(project)
     }
 
-    /// Saves current Copper project to the .toml project file
+    /// Saves current Copper project to the .yaml project file
     pub fn save(self, directory: &Path) -> io::Result<()> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::create(&file_path)?;
 
-        let toml_data = match toml::to_string(&self) {
-            Ok(toml) => toml,
+
+        let yaml_data = match serde_yaml::to_string(&self) {
+            Ok(yaml) => yaml,
             Err(err) => {
                 eprintln!("Unable to serialize project: {}", err);
                 process::exit(1);
             }
         };
 
-        file.write_all(toml_data.as_bytes())?;
+        file.write_all(yaml_data.as_bytes())?;
         file.flush()?;
         Ok(())
     }

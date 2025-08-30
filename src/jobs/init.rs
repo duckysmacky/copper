@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::{fs, io, process};
 use crate::config::{self, ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
 
-/// Initiates a new copper project by generating a copper.toml in the provided project location and
+/// Initiates a new copper project by generating a copper.yaml in the provided project location and
 /// filling in all the required data
 pub fn init(
     project_location: &Path,

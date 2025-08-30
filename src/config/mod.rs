@@ -12,7 +12,7 @@ pub use language::ProjectLanguage;
 pub use compiler::ProjectCompiler;
 pub use error::{Error, Result};
 
-pub const PROJECT_FILE_NAME: &str = "copper.toml";
+pub const PROJECT_FILE_NAME: &str = "copper.yaml";
 #[allow(dead_code)]
 pub const PROJECT_DIRECTORY_NAME: &str = ".copper";
 

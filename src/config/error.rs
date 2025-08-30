@@ -6,7 +6,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    /// The `copper.toml` configuration file was not found
+    /// The project configuration file was not found
     ProjectNotFound,
     /// Specified unit was not found in the list of the existing units
     UnitNotFound(String),

@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{fs, io, process};
 use serde::{Deserialize, Serialize};
 use crate::compiler::TargetInformation;
@@ -18,13 +18,17 @@ pub struct UnitConfig {
     source: PathBuf,
     /// Unit's build output location. Will convert `None` into a path generated from the
     /// default project path
+    #[serde(skip_serializing_if = "Option::is_none")]
     output_directory: Option<PathBuf>,
     /// Unit's intermediate files location. Will convert `None` into a path generated from the
     /// default project path
+    #[serde(skip_serializing_if = "Option::is_none")]
     intermediate_directory: Option<PathBuf>,
     /// Pre-unit additional include paths
+    #[serde(skip_serializing_if = "Option::is_none")]
     include_paths: Option<Vec<PathBuf>>,
     /// Per-unit additional compiler arguments
+    #[serde(skip_serializing_if = "Option::is_none")]
     additional_compiler_args: Option<String>,
 }
 
