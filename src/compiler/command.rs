@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 use std::borrow::Cow;
 use std::ffi::OsString;
-use crate::config::ProjectLanguage;
+use crate::project::ProjectLanguage;
 
 /// Specifies the compiler-specific option flags
 pub struct CompilerCommandFlags {

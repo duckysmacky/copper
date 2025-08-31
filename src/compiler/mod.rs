@@ -2,7 +2,7 @@ use std::process;
 use std::path::PathBuf;
 use command::CompilerCommand;
 use error::{Error, Result};
-use crate::config::{ProjectCompiler, ProjectLanguage, UnitType};
+use crate::project::{ProjectCompiler, ProjectLanguage, UnitType};
 
 mod gcc;
 mod util;

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use clap::{Args, Subcommand};
-use crate::config::UnitType;
+use crate::project::UnitType;
 
 /// Add a new component to the Copper project
 #[derive(Args)]

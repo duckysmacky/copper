@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
-use crate::config::{self, ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
+use crate::project::{self, ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
 
 /// Initiates a new copper project by generating a copper.yaml in the provided project location and
 /// filling in all the required data
@@ -66,7 +66,7 @@ pub fn init(
 /// Generates an example project configuration. Creates default directories and appends example
 /// unit and include path to project data
 fn add_example_config(project_location: &Path, units: &mut Vec<UnitConfig>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
-    use config::default;
+    use project::default;
     
     let src_dir = default::SOURCE_DIRECTORY();
     let build_dir = default::BUILD_DIRECTORY();

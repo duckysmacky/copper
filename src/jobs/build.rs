@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process;
 use crate::compiler::Compiler;
-use crate::config::{ProjectConfig, Error, Result};
+use crate::project::{ProjectConfig, Error, Result};
 
 pub fn build<'a>(unit_names: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
     let project = match ProjectConfig::import(project_location) {

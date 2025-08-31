@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use clap::Args;
-use crate::config::{ProjectLanguage, ProjectCompiler};
+use crate::project::{ProjectLanguage, ProjectCompiler};
 
 #[derive(Args)]
 pub struct InitCommand {

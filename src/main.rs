@@ -4,7 +4,7 @@ mod file;
 mod compiler;
 mod error;
 mod cli;
-mod config;
+mod project;
 mod jobs;
 
 fn main() {

@@ -2,7 +2,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use clap::ArgMatches;
 use crate::jobs;
-use crate::config::{ProjectLanguage, UnitType};
+use crate::project::{ProjectLanguage, UnitType};
 
 pub fn handle_init(matches: &ArgMatches) {
     let project_language = {

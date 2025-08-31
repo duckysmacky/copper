@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use crate::config::{ProjectConfig, UnitType};
+use crate::project::{ProjectConfig, UnitType};
 
 pub fn new_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
     let project = ProjectConfig::import(project_location);
