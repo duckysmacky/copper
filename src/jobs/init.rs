@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
-use crate::project::{self, ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
+use crate::project::{ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
 
 /// Initiates a new copper project by generating a copper.yaml in the provided project location and
 /// filling in all the required data
@@ -66,20 +66,12 @@ pub fn init(
 /// Generates an example project configuration. Creates default directories and appends example
 /// unit and include path to project data
 fn add_example_config(project_location: &Path, units: &mut Vec<UnitConfig>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
-    use project::default;
-    
-    let src_dir = default::SOURCE_DIRECTORY();
-    let build_dir = default::BUILD_DIRECTORY();
-
+    let src_dir = PathBuf::from("src");
     let unit_dir = src_dir.join("app");
     let include_dir = src_dir.join("include");
-    let bin_dir = build_dir.join(default::BINARY_DIRECTORY());
-    let obj_dir = build_dir.join(default::OBJECT_DIRECTORY());
 
     /// Skip the error if it is an 'already exists' error (since it is not critical in this case)
     fn skip_already_exists(err: io::Error) -> io::Result<()> { if err.kind() == io::ErrorKind::AlreadyExists { Ok(()) } else { Err(err) } }
-    fs::create_dir_all(project_location.join(&bin_dir)).or_else(skip_already_exists)?;
-    fs::create_dir_all(project_location.join(&obj_dir)).or_else(skip_already_exists)?;
     fs::create_dir_all(project_location.join(&include_dir)).or_else(skip_already_exists)?;
 
     *include_paths = Some(vec![include_dir]);
@@ -88,8 +80,8 @@ fn add_example_config(project_location: &Path, units: &mut Vec<UnitConfig>, incl
         "example_app".to_string(),
         UnitType::Binary,
         unit_dir,
-        bin_dir,
-        obj_dir,
+        None,
+        None,
         None,
         None,
     ));

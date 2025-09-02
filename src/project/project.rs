@@ -4,7 +4,8 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use crate::compiler::CompilerOptions;
-use super::{default, equals, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
+use crate::project::default::ProjectDefaults;
+use super::{ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
 
 /// Main Copper project configuration file
 #[derive(Debug, Serialize, Deserialize)]
@@ -14,33 +15,21 @@ pub struct ProjectConfig {
     #[serde(skip)]
     pub project_location: PathBuf,
     /// Name of the project
-    name: String,
+    pub name: String,
     /// Chosen language for the project
     pub language: ProjectLanguage,
     /// Chosen compiler for the project
     pub compiler: ProjectCompiler,
-    /// Default build directory path for all units
-    #[serde(default = "default::BUILD_DIRECTORY")]
-    #[serde(skip_serializing_if = "equals::BUILD_DIRECTORY")]
-    pub default_build_directory: PathBuf,
-    /// Default binary directory path for all units
-    #[serde(default = "default::BINARY_DIRECTORY")]
-    #[serde(skip_serializing_if = "equals::BINARY_DIRECTORY")]
-    pub default_binary_directory: PathBuf,
-    /// Default library directory path for all units
-    #[serde(default = "default::LIBRARY_DIRECTORY")]
-    #[serde(skip_serializing_if = "equals::LIBRARY_DIRECTORY")]
-    pub default_library_directory: PathBuf,
-    /// Default object files directory path for all units
-    #[serde(default = "default::OBJECT_DIRECTORY")]
-    #[serde(skip_serializing_if = "equals::OBJECT_DIRECTORY")]
-    pub default_object_directory: PathBuf,
     /// Project-wide additional include paths
     #[serde(skip_serializing_if = "Option::is_none")]
     pub global_include_paths: Option<Vec<PathBuf>>,
     /// Project-wide additional compiler arguments
     #[serde(skip_serializing_if = "Option::is_none")]
     pub global_additional_compiler_args: Option<String>,
+    /// Project-specific default values
+    #[serde(default = "ProjectDefaults::default")]
+    #[serde(skip_serializing_if = "ProjectDefaults::all_default")]
+    pub defaults: ProjectDefaults,
     /// Unit configuration data
     #[serde(skip_serializing_if = "Vec::is_empty")]
     units: Vec<UnitConfig>,
@@ -61,12 +50,9 @@ impl ProjectConfig {
             name,
             language,
             compiler,
-            default_build_directory: default::BUILD_DIRECTORY(),
-            default_binary_directory: default::BINARY_DIRECTORY(),
-            default_library_directory: default::LIBRARY_DIRECTORY(),
-            default_object_directory: default::OBJECT_DIRECTORY(),
             global_include_paths,
             global_additional_compiler_args: global_compiler_args,
+            defaults: ProjectDefaults::default(),
             units,
         }
     }
@@ -112,17 +98,12 @@ impl ProjectConfig {
 
     /// Creates a new unit with minimum configuration and adds it to the project
     pub fn add_unit(&mut self, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
-        let unit_type_directory = match &unit_type {
-            UnitType::Binary => &self.default_binary_directory,
-            UnitType::StaticLibrary | UnitType::DynamicLibrary => &self.default_library_directory,
-        };
-
         self.units.push(UnitConfig::new(
             unit_name,
             unit_type,
             unit_source,
-            self.default_build_directory.join(unit_type_directory),
-            self.default_build_directory.join(&self.default_object_directory),
+            None,
+            None,
             None,
             None,
         ))

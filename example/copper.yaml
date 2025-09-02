@@ -9,5 +9,3 @@ units:
   - name: example_app
     type: binary
     source: src/app
-    output-directory: build/bin
-    intermediate-directory: build/obj

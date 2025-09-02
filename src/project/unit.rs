@@ -16,12 +16,16 @@ pub struct UnitConfig {
     pub r#type: UnitType,
     /// Location of the unit within the project (source code files)
     source: PathBuf,
-    /// Unit's build output location. Will convert `None` into a path generated from the
-    /// default project path
+    /// Unit's build output location.
+    ///
+    /// If there is no unit output directory specified, it will be generated from the project's
+    /// defaults
     #[serde(skip_serializing_if = "Option::is_none")]
     output_directory: Option<PathBuf>,
-    /// Unit's intermediate files location. Will convert `None` into a path generated from the
-    /// default project path
+    /// Unit's intermediate files location.
+    ///
+    /// If there is no unit output directory specified, it will be generated from the project's
+    /// defaults
     #[serde(skip_serializing_if = "Option::is_none")]
     intermediate_directory: Option<PathBuf>,
     /// Pre-unit additional include paths
@@ -37,8 +41,8 @@ impl UnitConfig {
         name: String,
         r#type: UnitType,
         source: PathBuf,
-        output_directory: PathBuf,
-        intermediate_directory: PathBuf,
+        output_directory: Option<PathBuf>,
+        intermediate_directory: Option<PathBuf>,
         include_paths: Option<Vec<PathBuf>>,
         additional_compiler_args: Option<String>,
     ) -> Self {
@@ -46,8 +50,8 @@ impl UnitConfig {
             name,
             r#type,
             source,
-            output_directory: Some(output_directory),
-            intermediate_directory: Some(intermediate_directory),
+            output_directory,
+            intermediate_directory,
             include_paths,
             additional_compiler_args,
         }
@@ -61,7 +65,7 @@ impl UnitConfig {
         let mut source_file_paths = Vec::new();
         if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &parent_project.language.extensions()) {
             eprintln!("Unable to get unit's source files: {}", err.to_string());
-            process::exit(1);
+            return None;
         }
 
         if source_file_paths.is_empty() {
@@ -72,19 +76,16 @@ impl UnitConfig {
         // Output and intermediate directories should be passed as relative to where the project is
         // located
         let output_directory = {
-            let dir = match &self.output_directory {
-                Some(dir) => dir,
-                None => &self.generate_output_directory(parent_project),
-            };
-            parent_project.project_location.join(dir)
+            let directory = self.output_directory.as_ref().unwrap_or(match &self.r#type {
+                UnitType::Binary => &parent_project.defaults.binary_directory,
+                _ => &parent_project.defaults.library_directory,
+            });
+            parent_project.project_location.join(directory)
         };
         
         let intermediate_directory = {
-            let dir = match &self.intermediate_directory {
-                Some(dir) => dir,
-                None => &self.generate_intermediate_directory(parent_project)
-            };
-            parent_project.project_location.join(dir)
+            let directory = self.output_directory.as_ref().unwrap_or(&parent_project.defaults.object_directory);
+            parent_project.project_location.join(directory)
         };
         
         if let Err(err) = fs::create_dir_all(&output_directory) {
@@ -134,21 +135,6 @@ impl UnitConfig {
         }
 
         Ok(())
-    }
-
-    /// Generates an output directory based on the project's defaults and self's type
-    fn generate_output_directory(&self, parent_project: &ProjectConfig) -> PathBuf {
-        let build_dir = &parent_project.default_build_directory;
-
-        match self.r#type {
-            UnitType::Binary => build_dir.join(&parent_project.default_binary_directory),
-            UnitType::StaticLibrary | UnitType::DynamicLibrary => build_dir.join(&parent_project.default_library_directory)
-        }
-    }
-
-    /// Generates an intermediate directory based on the project's defaults
-    fn generate_intermediate_directory(&self, parent_project: &ProjectConfig) -> PathBuf {
-        parent_project.default_build_directory.join(&parent_project.default_object_directory)
     }
 }
 
