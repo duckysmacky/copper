@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
+use std::rc::Rc;
 use crate::project::{ProjectConfig, ProjectLanguage, ProjectCompiler, UnitConfig, UnitType};
 
 /// Initiates a new copper project by generating a copper.yaml in the provided project location and
@@ -20,36 +21,32 @@ pub fn init(
             }
         }
     };
-
-    let mut include_paths = None;
-    let mut units = Vec::new();
-
-    if !fs::exists(&project_location).unwrap_or(false) {
-        if let Err(err) = fs::create_dir_all(&project_location) {
-            println!("Error creating project directory: {}", err);
+    
+    let mut project = ProjectConfig::new(
+        project_location.to_path_buf(),
+        project_name,
+        project_language,
+        default_compiler,
+    );
+    
+    if !fs::exists(project_location).unwrap_or(false) {
+        if let Err(err) = fs::create_dir_all(project_location) {
+            println!("Unable to create project directory '{}'", project_location.display());
+            println!("\tCause: {}", err);
             process::exit(1);
         }
     }
 
     if generate_example {
-        match add_example_config(project_location, &mut units, &mut include_paths) {
+        match add_example_config(&mut project) {
             Ok(_) => println!("Successfully generated example project structure"),
             Err(err) => {
-                println!("Error generating example project structure: {}", err);
+                println!("Unable to generate example project structure");
+                println!("\tCause: {}", err);
                 process::exit(1);
             }
         }
     }
-
-    let project = ProjectConfig::new(
-        project_location.to_path_buf(),
-        project_name,
-        project_language,
-        default_compiler,
-        include_paths,
-        None,
-        units,
-    );
 
     match project.save(project_location) {
         Ok(_) => {
@@ -65,26 +62,28 @@ pub fn init(
 
 /// Generates an example project configuration. Creates default directories and appends example
 /// unit and include path to project data
-fn add_example_config(project_location: &Path, units: &mut Vec<UnitConfig>, include_paths: &mut Option<Vec<PathBuf>>) -> io::Result<()> {
+fn add_example_config(project: &mut Rc<ProjectConfig>) -> io::Result<()> {
     let src_dir = PathBuf::from("src");
     let unit_dir = src_dir.join("app");
     let include_dir = src_dir.join("include");
 
     /// Skip the error if it is an 'already exists' error (since it is not critical in this case)
     fn skip_already_exists(err: io::Error) -> io::Result<()> { if err.kind() == io::ErrorKind::AlreadyExists { Ok(()) } else { Err(err) } }
-    fs::create_dir_all(project_location.join(&include_dir)).or_else(skip_already_exists)?;
+    fs::create_dir_all(project.root_path.join(&include_dir)).or_else(skip_already_exists)?;
 
-    *include_paths = Some(vec![include_dir]);
-
-    units.push(UnitConfig::new(
-        "example_app".to_string(),
-        UnitType::Binary,
-        unit_dir,
-        None,
-        None,
-        None,
-        None,
-    ));
+    {
+        match Rc::get_mut(project) {
+            Some(project) => {
+                project.global_include_paths.push(include_dir);
+            },
+            None => {
+                eprintln!("Unable to add example include path to project");
+                eprintln!("\tCause: multiple mutable references to project already exist");
+                process::exit(1);
+            }
+        }
+    }
+    project.add_unit("example".to_string(), UnitType::Binary, unit_dir);
 
     Ok(())
 }

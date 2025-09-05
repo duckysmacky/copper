@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::{fs, io, process};
+use std::rc::{Rc, Weak};
 use serde::{Deserialize, Serialize};
 use crate::compiler::TargetInformation;
 use super::{ProjectConfig, Error};
@@ -10,6 +11,9 @@ use super::{ProjectConfig, Error};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct UnitConfig {
+    /// Reference to the parent project configuration
+    #[serde(skip)]
+    project_reference: Weak<ProjectConfig>,
     /// Name of the unit
     pub name: String,
     /// Type of the unit
@@ -20,51 +24,51 @@ pub struct UnitConfig {
     ///
     /// If there is no unit output directory specified, it will be generated from the project's
     /// defaults
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     output_directory: Option<PathBuf>,
     /// Unit's intermediate files location.
     ///
     /// If there is no unit output directory specified, it will be generated from the project's
     /// defaults
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     intermediate_directory: Option<PathBuf>,
     /// Pre-unit additional include paths
-    #[serde(skip_serializing_if = "Option::is_none")]
-    include_paths: Option<Vec<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    include_paths: Vec<PathBuf>,
     /// Per-unit additional compiler arguments
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     additional_compiler_args: Option<String>,
 }
 
 impl UnitConfig {
     pub fn new(
+        project_reference: Weak<ProjectConfig>,
         name: String,
         r#type: UnitType,
         source: PathBuf,
-        output_directory: Option<PathBuf>,
-        intermediate_directory: Option<PathBuf>,
-        include_paths: Option<Vec<PathBuf>>,
-        additional_compiler_args: Option<String>,
     ) -> Self {
         UnitConfig {
+            project_reference,
             name,
             r#type,
             source,
-            output_directory,
-            intermediate_directory,
-            include_paths,
-            additional_compiler_args,
+            output_directory: None,
+            intermediate_directory: None,
+            include_paths: Vec::new(),
+            additional_compiler_args: None,
         }
     }
     
     /// Collects needed information about the unit and returns target information for later usage
     /// with a compiler
-    pub fn get_target_information(&self, parent_project: &ProjectConfig) -> Option<TargetInformation> {
-        let unit_path = parent_project.project_location.join(&self.source);
-        
+    pub fn get_target_information(&self) -> Option<TargetInformation> {
+        let project = self.get_project()?;
+        let unit_path = project.root_path.join(&self.source);
+
         let mut source_file_paths = Vec::new();
-        if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &parent_project.language.extensions()) {
-            eprintln!("Unable to get unit's source files: {}", err.to_string());
+        if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &project.language.extensions()) {
+            eprintln!("Unable to get unit's source files");
+            eprintln!("\tCause: {}", err);
             return None;
         }
 
@@ -77,44 +81,41 @@ impl UnitConfig {
         // located
         let output_directory = {
             let directory = self.output_directory.as_ref().unwrap_or(match &self.r#type {
-                UnitType::Binary => &parent_project.defaults.binary_directory,
-                _ => &parent_project.defaults.library_directory,
+                UnitType::Binary => &project.defaults.binary_directory,
+                _ => &project.defaults.library_directory,
             });
-            parent_project.project_location.join(directory)
+            project.root_path.join(directory)
         };
-        
+
         let intermediate_directory = {
-            let directory = self.output_directory.as_ref().unwrap_or(&parent_project.defaults.object_directory);
-            parent_project.project_location.join(directory)
+            let directory = self.output_directory.as_ref().unwrap_or(&project.defaults.object_directory);
+            project.root_path.join(directory)
         };
-        
+
+        // TODO: move into compiler logic
         if let Err(err) = fs::create_dir_all(&output_directory) {
             if err.kind() != io::ErrorKind::AlreadyExists {
-                eprintln!("Unable to create unit's output directory: {}", err.to_string());
+                eprintln!("Unable to create unit's output directory");
+                eprintln!("\tCause: {}", err);
                 process::exit(1);
             }
         }
 
-        let mut output_file = output_directory.join(&self.name);
-        match self.r#type {
-            UnitType::Binary => {
-                if cfg!(windows) {
-                    output_file.set_extension("exe");
-                }
-            },
-            _ => unimplemented!()
-        }
-
-        
         Some(TargetInformation::new(
             self.name.clone(),
             self.r#type.clone(),
             source_file_paths,
             output_directory,
             intermediate_directory,
-            self.include_paths.clone(),
+            Some(self.include_paths.clone()),
             self.additional_compiler_args.clone(),
         ))
+    }
+    
+    /// Returns a reference to the parent project configuration, if it is still valid (the project 
+    /// itself was not dropped)
+    pub fn get_project(&self) -> Option<Rc<ProjectConfig>> {
+        self.project_reference.upgrade()
     }
 
     /// Recursively searches the directory for the source files by extension (according to the

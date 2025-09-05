@@ -38,7 +38,7 @@ fn build_units<'a>(project: &ProjectConfig, unit_names: Option<impl Iterator<Ite
     for unit_name in unit_names {
         
         let target = match project.find_unit(unit_name) {
-            Some(unit) => unit.get_target_information(&project),
+            Some(unit) => unit.get_target_information(),
             None => return Err(Error::UnitNotFound(unit_name.to_string())),
         };
         

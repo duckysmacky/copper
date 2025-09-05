@@ -2,6 +2,7 @@ use std::process;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use crate::compiler::CompilerOptions;
 use crate::project::default::ProjectDefaults;
@@ -13,7 +14,7 @@ use super::{ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE
 pub struct ProjectConfig {
     /// Location of the Copper project relative to where the command was executed.
     #[serde(skip)]
-    pub project_location: PathBuf,
+    pub root_path: PathBuf,
     /// Name of the project
     pub name: String,
     /// Chosen language for the project
@@ -21,17 +22,16 @@ pub struct ProjectConfig {
     /// Chosen compiler for the project
     pub compiler: ProjectCompiler,
     /// Project-wide additional include paths
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub global_include_paths: Option<Vec<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub global_include_paths: Vec<PathBuf>,
     /// Project-wide additional compiler arguments
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub global_additional_compiler_args: Option<String>,
     /// Project-specific default values
-    #[serde(default = "ProjectDefaults::default")]
-    #[serde(skip_serializing_if = "ProjectDefaults::all_default")]
+    #[serde(default, skip_serializing_if = "ProjectDefaults::all_default")]
     pub defaults: ProjectDefaults,
     /// Unit configuration data
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     units: Vec<UnitConfig>,
 }
 
@@ -41,24 +41,21 @@ impl ProjectConfig {
         name: String,
         language: ProjectLanguage,
         compiler: ProjectCompiler,
-        global_include_paths: Option<Vec<PathBuf>>,
-        global_compiler_args: Option<String>,
-        units: Vec<UnitConfig>,
-    ) -> Self {
-        ProjectConfig {
-            project_location,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            root_path: project_location,
             name,
             language,
             compiler,
-            global_include_paths,
-            global_additional_compiler_args: global_compiler_args,
+            global_include_paths: Vec::new(),
+            global_additional_compiler_args: None,
             defaults: ProjectDefaults::default(),
-            units,
-        }
+            units: Vec::new(),
+        })
     }
 
     /// Imports a Copper project from a .yaml project file
-    pub fn import(directory: &Path) -> io::Result<Self> {
+    pub fn import(directory: &Path) -> io::Result<Rc<Self>> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::open(file_path)?;
 
@@ -73,20 +70,20 @@ impl ProjectConfig {
             }
         };
 
-        project.project_location = directory.to_path_buf();
-        Ok(project)
+        project.root_path = directory.to_path_buf();
+        Ok(Rc::new(project))
     }
 
     /// Saves current Copper project to the .yaml project file
-    pub fn save(self, directory: &Path) -> io::Result<()> {
+    pub fn save(&self, directory: &Path) -> io::Result<()> {
         let file_path = directory.join(PROJECT_FILE_NAME);
         let mut file = File::create(&file_path)?;
 
-
-        let yaml_data = match serde_yaml::to_string(&self) {
+        let yaml_data = match serde_yaml::to_string(self) {
             Ok(yaml) => yaml,
             Err(err) => {
-                eprintln!("Unable to serialize project: {}", err);
+                eprintln!("Unable to serialize project");
+                eprintln!("\tCause: {}", err);
                 process::exit(1);
             }
         };
@@ -97,16 +94,22 @@ impl ProjectConfig {
     }
 
     /// Creates a new unit with minimum configuration and adds it to the project
-    pub fn add_unit(&mut self, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
-        self.units.push(UnitConfig::new(
+    pub fn add_unit(self: &mut Rc<Self>, unit_name: String, unit_type: UnitType, unit_source: PathBuf) {
+        let new_unit = UnitConfig::new(
+            Rc::downgrade(self),
             unit_name,
             unit_type,
             unit_source,
-            None,
-            None,
-            None,
-            None,
-        ))
+        );
+        
+        match Rc::get_mut(self) {
+            Some(project) => project.units.push(new_unit),
+            None => {
+                eprintln!("Unable to add a new unit to the project");
+                eprintln!("\tCause: multiple mutable references to the project already exist");
+                process::exit(1);
+            }
+        }
     }
 
     /// Searches for a unit in project by the provided name. If not found, returns None
@@ -124,15 +127,15 @@ impl ProjectConfig {
     /// Returns an iterator containing the names of the all project units
     pub fn get_unit_names(&self) -> Vec<&String> {
         self.units.iter()
-        .map(|unit| &unit.name)
-        .collect()
+            .map(|unit| &unit.name)
+            .collect()
     }
     
     pub fn get_compiler_options(&self) -> CompilerOptions {
         CompilerOptions::new(
-            self.project_location.clone(),
+            self.root_path.clone(),
             self.language.clone(),
-            self.global_include_paths.clone(),
+            Some(self.global_include_paths.clone()),
             self.global_additional_compiler_args.clone(),
         )
     }
