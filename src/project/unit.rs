@@ -2,18 +2,21 @@ use std::ffi::OsString;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::{fs, io, process};
+use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use serde::{Deserialize, Serialize};
 use crate::compiler::TargetInformation;
-use super::{ProjectConfig, Error};
+use super::ProjectConfig;
 
-/// Configuration for the project unit
+/// A Copper unit configuration. This struct represents the contents of a unit entry in the
+/// copper.yaml file
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct UnitConfig {
     /// Reference to the parent project configuration
     #[serde(skip)]
-    project_reference: Weak<ProjectConfig>,
+    project_reference: Weak<RefCell<ProjectConfig>>,
     /// Name of the unit
     pub name: String,
     /// Type of the unit
@@ -42,7 +45,7 @@ pub struct UnitConfig {
 
 impl UnitConfig {
     pub fn new(
-        project_reference: Weak<ProjectConfig>,
+        project_reference: Weak<RefCell<ProjectConfig>>,
         name: String,
         r#type: UnitType,
         source: PathBuf,
@@ -61,61 +64,93 @@ impl UnitConfig {
     
     /// Collects needed information about the unit and returns target information for later usage
     /// with a compiler
+    // TODO: improve error handling
     pub fn get_target_information(&self) -> Option<TargetInformation> {
-        let project = self.get_project()?;
-        let unit_path = project.root_path.join(&self.source);
+        if let Some(project) = self.get_project() {
+            let project_config = project.borrow();
+            // output and intermediate directories should be passed as relative to where the project is located
+            let output_directory = self.get_output_directory(project_config.deref(), true);
+            let intermediate_directory = self.get_intermediate_directory(project_config.deref(), true);
 
-        let mut source_file_paths = Vec::new();
-        if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &project.language.extensions()) {
-            eprintln!("Unable to get unit's source files");
-            eprintln!("\tCause: {}", err);
-            return None;
+            let mut source_file_paths = Vec::new();
+            let unit_path = project_config.root_path.join(&self.source);
+            let extensions = project_config.language.extensions();
+            if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &extensions) {
+                eprintln!("Unable to get unit's source files");
+                eprintln!("\tCause: {}", err);
+                return None;
+            }
+
+            if source_file_paths.is_empty() {
+                eprintln!("There are no source files to build");
+                return None;
+            }
+
+            // TODO: move into compiler logic
+            if let Err(err) = fs::create_dir_all(&output_directory) {
+                if err.kind() != io::ErrorKind::AlreadyExists {
+                    eprintln!("Unable to create unit's output directory");
+                    eprintln!("\tCause: {}", err);
+                    process::exit(1);
+                }
+            }
+
+            Some(TargetInformation::new(
+                self.name.clone(),
+                self.r#type.clone(),
+                source_file_paths,
+                output_directory,
+                intermediate_directory,
+                Some(self.include_paths.clone()),
+                self.additional_compiler_args.clone(),
+            ))
+        } else {
+            eprintln!("Unit '{}' is not associated with any project", self.name);
+            eprintln!("Cause: Project reference is invalid");
+            None
         }
+    }
+    
+    /// Sets the parent project configuration reference for the unit
+    pub fn set_project(&mut self, project: &Rc<RefCell<ProjectConfig>>) {
+        self.project_reference = Rc::downgrade(project);
+    }
 
-        if source_file_paths.is_empty() {
-            eprintln!("There are no source files to build");
-            return None;
-        }
-
-        // Output and intermediate directories should be passed as relative to where the project is
-        // located
-        let output_directory = {
-            let directory = self.output_directory.as_ref().unwrap_or(match &self.r#type {
+    /// Returns a reference to the parent project configuration, if it is still valid (the project 
+    /// itself was not dropped)
+    pub fn get_project(&self) -> Option<Rc<RefCell<ProjectConfig>>> {
+        self.project_reference.upgrade()
+    }
+    
+    /// Returns the output directory for the unit, either specified in the unit itself or from the
+    /// project defaults. If `rooted` is true, the path will be absolute (rooted at the project root),
+    /// otherwise it will be relative to the project root
+    fn get_output_directory(&self, project: &ProjectConfig, rooted: bool) -> PathBuf {
+        let directory = self.output_directory.as_ref()
+            .unwrap_or(match &self.r#type {
                 UnitType::Binary => &project.defaults.binary_directory,
                 _ => &project.defaults.library_directory,
             });
-            project.root_path.join(directory)
-        };
-
-        let intermediate_directory = {
-            let directory = self.output_directory.as_ref().unwrap_or(&project.defaults.object_directory);
-            project.root_path.join(directory)
-        };
-
-        // TODO: move into compiler logic
-        if let Err(err) = fs::create_dir_all(&output_directory) {
-            if err.kind() != io::ErrorKind::AlreadyExists {
-                eprintln!("Unable to create unit's output directory");
-                eprintln!("\tCause: {}", err);
-                process::exit(1);
-            }
+        
+        if !rooted {
+            return directory.clone();
         }
-
-        Some(TargetInformation::new(
-            self.name.clone(),
-            self.r#type.clone(),
-            source_file_paths,
-            output_directory,
-            intermediate_directory,
-            Some(self.include_paths.clone()),
-            self.additional_compiler_args.clone(),
-        ))
+        
+        project.root_path.join(directory)
     }
     
-    /// Returns a reference to the parent project configuration, if it is still valid (the project 
-    /// itself was not dropped)
-    pub fn get_project(&self) -> Option<Rc<ProjectConfig>> {
-        self.project_reference.upgrade()
+    /// Returns the intermediate directory for the unit, either specified in the unit itself or from the
+    /// project defaults. If `rooted` is true, the path will be absolute (rooted at the project root),
+    /// otherwise it will be relative to the project root
+    fn get_intermediate_directory(&self, project: &ProjectConfig, rooted: bool) -> PathBuf {
+        let directory = self.intermediate_directory.as_ref()
+            .unwrap_or(&project.defaults.object_directory);
+        
+        if !rooted {
+            return directory.clone();
+        }
+        
+        project.root_path.join(directory)
     }
 
     /// Recursively searches the directory for the source files by extension (according to the
@@ -170,14 +205,14 @@ impl Display for UnitType {
 }
 
 impl TryFrom<String> for UnitType {
-    type Error = Error;
+    type Error = super::Error;
     
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             Self::BINARY_STR | "bin" => Ok(UnitType::Binary),
             Self::STATIC_LIBRARY_STR | "static-lib" => Ok(UnitType::StaticLibrary),
             Self::DYNAMIC_LIBRARY_STR | "dynamic-lib" => Ok(UnitType::DynamicLibrary),
-            _ => Err(Error::InvalidUnitType(value)),
+            _ => Err(super::Error::InvalidUnitType(value)),
         }
     }
 }

@@ -7,7 +7,7 @@ mod language;
 mod compiler;
 mod default;
 
-pub use project::ProjectConfig;
+pub use project::{CopperProject, ProjectConfig};
 pub use unit::{UnitConfig, UnitType};
 pub use language::ProjectLanguage;
 pub use compiler::ProjectCompiler;

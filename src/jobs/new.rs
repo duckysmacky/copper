@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use crate::project::{ProjectConfig, UnitType};
+use crate::project::{CopperProject, UnitType};
 
 pub fn new_unit(project_location: &Path, unit_name: &str, unit_type: UnitType, unit_source: PathBuf) {
-    let project = ProjectConfig::import(project_location);
+    let project = CopperProject::import(project_location);
 
     match project {
-        Ok(mut project) => {
+        Ok(project) => {
             project.add_unit(unit_name.to_string(), unit_type.clone(), unit_source);
 
             if let Err(err) = project.save(project_location) {
