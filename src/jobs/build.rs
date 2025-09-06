@@ -1,10 +1,14 @@
-use std::path::Path;
+
+use std::path::PathBuf;
 use std::process;
+use clap::ArgMatches;
 use crate::compiler::Compiler;
 use crate::project::{CopperProject};
 
-// TODO: refactor build process
-pub fn build<'a>(unit_names: Option<impl Iterator<Item = &'a String>>, project_location: &Path) {
+/// Handles the project build process
+pub fn handle_build(matches: &ArgMatches) {
+    let project_location = matches.get_one::<PathBuf>("location").unwrap();
+
     let project = match CopperProject::import(project_location) {
         Ok(project) => project,
         Err(err) => {
@@ -16,22 +20,15 @@ pub fn build<'a>(unit_names: Option<impl Iterator<Item = &'a String>>, project_l
         }
     };
     
-    build_units(&project, unit_names);
-    println!("Copper project build finished");
-}
-
-/// Builds specifies units (by name) or the whole project (all units)
-fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Item = &'a String>>) {
     let project_config = project.get_config();
     
-    let unit_names = match unit_names {
-        None => project_config.get_unit_names(),
-        Some(names) => names.collect(),
-    };
-    
+    let unit_names = matches.get_many::<String>("units")
+        .map(|units| units.into_iter().collect())
+        .unwrap_or(project_config.get_unit_names());
+
     if unit_names.is_empty() {
-        println!("The project has no units to build");
-        return;
+        eprintln!("There are no units to build");
+        process::exit(1);
     }
     
     let compiler_options = project.get_compiler_options();
@@ -48,7 +45,11 @@ fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Ite
         };
         
         match target {
-            Ok(target) => compiler.build(target),
+            Ok(target) => {
+                println!("Unit '{}' build started", unit_name);
+                compiler.build(target);
+                println!("Unit '{}' build finished", unit_name);
+            }
             Err(err) => {
                 eprintln!("An error occurred while preparing the unit '{}' for build: {}", unit_name, err.message());
                 if let Some(cause) = err.cause() {
@@ -58,4 +59,6 @@ fn build_units<'a>(project: &CopperProject, unit_names: Option<impl Iterator<Ite
             }
         }
     }
+
+    println!("Copper project build finished");
 }

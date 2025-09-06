@@ -1,33 +1,49 @@
+use std::{env, fs, io, process};
 use std::path::{Path, PathBuf};
-use std::{fs, io, process};
-use crate::project::{CopperProject, ProjectLanguage, ProjectCompiler, UnitType};
+use clap::ArgMatches;
+use crate::project::{CopperProject, ProjectCompiler, ProjectLanguage, UnitType};
 
-/// Initiates a new copper project by generating a copper.yaml in the provided project location and
-/// filling in all the required data
-pub fn init(
-    project_location: &Path,
-    project_name: String, 
-    project_language: ProjectLanguage, 
-    generate_example: bool
-) {
-    let default_compiler = {
-        if cfg!(windows) {
-            ProjectCompiler::MSVC
-        } else {
-            match &project_language {
-                ProjectLanguage::C => ProjectCompiler::GCC,
-                ProjectLanguage::CPP => ProjectCompiler::GPP
-            }
-        }
+/// Handles the main project initialization logic
+/// 
+/// Initiates a new copper project by generating a copper.yaml in the provided
+/// project location and filling in all the required data
+pub fn handle_init(matches: &ArgMatches) {
+    let project_location = matches.get_one::<PathBuf>("location").unwrap();
+
+    let project_language = {
+        let language_str = matches.get_one::<String>("language").unwrap();
+        ProjectLanguage::try_from(language_str.to_string()).unwrap()
     };
     
+    let project_compiler = {
+        let compiler_str = matches.get_one::<String>("compiler").unwrap();
+        ProjectCompiler::try_from(compiler_str.to_string()).unwrap()
+    };
+
+    let project_name = match matches.get_one::<String>("name") {
+        Some(name) => String::from(name),
+        None => {
+            let directory = if project_location == Path::new("../..") {
+                let current = env::current_dir().unwrap();
+                let name = current.file_name().unwrap();
+                name.to_os_string()
+            } else {
+                let name = project_location.file_name().unwrap();
+                name.to_os_string()
+            };
+            String::from(directory.to_string_lossy())
+        }
+    };
+
     let project = CopperProject::new(
         project_location.to_path_buf(),
         project_name,
         project_language,
-        default_compiler,
+        project_compiler
     );
-    
+
+    let generate_example = matches.get_flag("example") && !matches.get_flag("minimal");
+        
     if !fs::exists(project_location).unwrap_or(false) {
         if let Err(err) = fs::create_dir_all(project_location) {
             println!("Unable to create project directory '{}'", project_location.display());
@@ -37,6 +53,7 @@ pub fn init(
     }
 
     if generate_example {
+        println!("Generating example project structure...");
         match add_example_config(&project) {
             Ok(_) => println!("Successfully generated example project structure"),
             Err(err) => {
