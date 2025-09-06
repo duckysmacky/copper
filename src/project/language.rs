@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ffi::OsString;
 use serde::{Deserialize, Serialize};
-use crate::error::Error;
+use super::{Error, ErrorKind};
 
 /// Enum representing available project languages
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,7 +40,7 @@ impl TryFrom<String> for ProjectLanguage {
         match value.to_lowercase().trim() {
             Self::C_STR => Ok(ProjectLanguage::C),
             Self::CPP_STR => Ok(ProjectLanguage::CPP),
-            _ => Err(Error::EnumParseError(format!("Unexpected language value: {}", value)))
+            _ => Err(Error::new(ErrorKind::InvalidLanguage, format!("'{}' is not a valid language value", value)))
         }
     }
 }

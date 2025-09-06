@@ -1,13 +1,13 @@
 use std::ffi::OsString;
 use std::fmt::Display;
 use std::path::PathBuf;
-use std::{fs, io, process};
+use std::{fs, io};
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use serde::{Deserialize, Serialize};
 use crate::compiler::TargetInformation;
-use super::ProjectConfig;
+use super::{ProjectConfig, Result, Error, ErrorKind};
 
 /// A Copper unit configuration. This struct represents the contents of a unit entry in the
 /// copper.yaml file
@@ -64,8 +64,7 @@ impl UnitConfig {
     
     /// Collects needed information about the unit and returns target information for later usage
     /// with a compiler
-    // TODO: improve error handling
-    pub fn get_target_information(&self) -> Option<TargetInformation> {
+    pub fn get_target_information(&self) -> Result<TargetInformation> {
         if let Some(project) = self.get_project() {
             let project_config = project.borrow();
             // output and intermediate directories should be passed as relative to where the project is located
@@ -76,26 +75,21 @@ impl UnitConfig {
             let unit_path = project_config.root_path.join(&self.source);
             let extensions = project_config.language.extensions();
             if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &extensions) {
-                eprintln!("Unable to get unit's source files");
-                eprintln!("\tCause: {}", err);
-                return None;
+                return Err(Error::new(ErrorKind::IOError("Unable to get unit's source files".to_string()), err));
             }
 
             if source_file_paths.is_empty() {
-                eprintln!("There are no source files to build");
-                return None;
+                return Err(Error::no_cause(ErrorKind::NoSourceFiles));
             }
 
             // TODO: move into compiler logic
             if let Err(err) = fs::create_dir_all(&output_directory) {
                 if err.kind() != io::ErrorKind::AlreadyExists {
-                    eprintln!("Unable to create unit's output directory");
-                    eprintln!("\tCause: {}", err);
-                    process::exit(1);
+                    return Err(Error::new(ErrorKind::IOError("Unable to create unit's output directory".to_string()), err));
                 }
             }
 
-            Some(TargetInformation::new(
+            Ok(TargetInformation::new(
                 self.name.clone(),
                 self.r#type.clone(),
                 source_file_paths,
@@ -105,9 +99,7 @@ impl UnitConfig {
                 self.additional_compiler_args.clone(),
             ))
         } else {
-            eprintln!("Unit '{}' is not associated with any project", self.name);
-            eprintln!("Cause: Project reference is invalid");
-            None
+            Err(Error::new(ErrorKind::ProjectUnavailable, "Unit's project reference is invalid"))
         }
     }
     
@@ -205,14 +197,14 @@ impl Display for UnitType {
 }
 
 impl TryFrom<String> for UnitType {
-    type Error = super::Error;
+    type Error = Error;
     
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
-            Self::BINARY_STR | "bin" => Ok(UnitType::Binary),
-            Self::STATIC_LIBRARY_STR | "static-lib" => Ok(UnitType::StaticLibrary),
-            Self::DYNAMIC_LIBRARY_STR | "dynamic-lib" => Ok(UnitType::DynamicLibrary),
-            _ => Err(super::Error::InvalidUnitType(value)),
+            Self::BINARY_STR => Ok(UnitType::Binary),
+            Self::STATIC_LIBRARY_STR => Ok(UnitType::StaticLibrary),
+            Self::DYNAMIC_LIBRARY_STR => Ok(UnitType::DynamicLibrary),
+            _ => Err(Error::new(ErrorKind::InvalidUnitType, format!("'{}' is not a valid unit type", value))),
         }
     }
 }

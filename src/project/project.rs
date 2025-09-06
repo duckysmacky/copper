@@ -1,6 +1,5 @@
-use std::process;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -9,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::compiler::CompilerOptions;
 use crate::project::default::ProjectDefaults;
 use super::{ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
+use super::{Error, Result, ErrorKind};
 
 /// The main Copper project configuration. This struct represents the whole .yaml project configuration
 /// file (copper.yaml)
@@ -86,21 +86,18 @@ impl CopperProject {
     }
 
     /// Imports a Copper project from a .yaml project file
-    pub fn import(directory: &Path) -> io::Result<Self> {
+    // TODO: rename from 'import' to 'load'
+    pub fn import(directory: &Path) -> Result<Self> {
         let file_path = directory.join(PROJECT_FILE_NAME);
-        let mut file = File::open(file_path)?;
+        let mut file = File::open(file_path)
+            .map_err(|err| Error::new(ErrorKind::IOError("Unable to open project file".to_string()), err))?;
 
         let mut file_data = String::new();
-        file.read_to_string(&mut file_data)?;
+        file.read_to_string(&mut file_data)
+            .map_err(|err| Error::new(ErrorKind::IOError("Unable to read project file".to_string()), err))?;
 
-        let mut config: ProjectConfig = match serde_yaml::from_str(&file_data) {
-            Ok(project) => project,
-            Err(err) => {
-                eprintln!("Unable to deserialize project");
-                eprintln!("\tCause: {}", err);
-                process::exit(1);
-            }
-        };
+        let mut config: ProjectConfig = serde_yaml::from_str(&file_data)
+            .map_err(|err| Error::new(ErrorKind::ConfigError, err))?;
 
         config.root_path = directory.to_path_buf();
         let config = Rc::new(RefCell::new(config));
@@ -115,22 +112,19 @@ impl CopperProject {
     }
 
     /// Saves current Copper project to the .yaml project file
-    pub fn save(&self, directory: &Path) -> io::Result<()> {
+    pub fn save(&self, directory: &Path) -> Result<()> {
         let config = self.get_config();
         let file_path = directory.join(PROJECT_FILE_NAME);
-        let mut file = File::create(&file_path)?;
+        let mut file = File::create(&file_path)
+            .map_err(|err| Error::new(ErrorKind::IOError("Unable to open project file".to_string()), err))?;
 
-        let yaml_data = match serde_yaml::to_string(config.deref()) {
-            Ok(yaml) => yaml,
-            Err(err) => {
-                eprintln!("Unable to serialize project");
-                eprintln!("\tCause: {}", err);
-                process::exit(1);
-            }
-        };
+        let yaml_data = serde_yaml::to_string(config.deref())
+            .map_err(|err| Error::new(ErrorKind::ConfigError, err))?;
 
-        file.write_all(yaml_data.as_bytes())?;
-        file.flush()?;
+        (|| {
+            file.write_all(yaml_data.as_bytes())?;
+            file.flush()
+        })().map_err(|err| Error::new(ErrorKind::IOError("Unable to write project file".to_string()), err))?;
         Ok(())
     }
 

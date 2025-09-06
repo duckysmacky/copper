@@ -11,7 +11,7 @@ pub use project::{CopperProject, ProjectConfig};
 pub use unit::{UnitConfig, UnitType};
 pub use language::ProjectLanguage;
 pub use compiler::ProjectCompiler;
-pub use error::{Error, Result};
+use error::{Result, Error, ErrorKind};
 
 pub const PROJECT_FILE_NAME: &str = "copper.yaml";
 #[allow(dead_code)]

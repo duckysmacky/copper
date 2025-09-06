@@ -1,43 +1,59 @@
-#![allow(dead_code)]
-use std::fmt::{Display, Formatter};
+use std::{fmt};
 use std::process::Output;
 
-/// Type alias for the custom error type
-pub type Result<T> = std::result::Result<T, Error>;
+/// A trait for error kinds used in CopperError
+/// 
+/// This trait requires the implementation of the Display trait for better error messages
+/// when printing the error kind
+pub trait CopperErrorKind: fmt::Display {}
 
-/// Custom error type
+/// A generic error type for Copper-related errors that can hold different kinds of error 
+/// information. The error kind must implement the CopperErrorKind trait. This allows for
+/// more specific error handling while still using a common error structure.
+/// 
+/// This error type should be used directly, instead the K generic type parameter should be
+/// used to specify the exact kind of error being represented by each of the modules.
 #[derive(Debug)]
-pub enum Error {
-    /// Error related to configuration of the project
-    ProjectConfigError(String),
-    /// Error related to the Copper project in general
-    ProjectError(String),
-    /// Error related to the Copper unit in general
-    UnitError(String),
-    /// Error related to writing and reading files and directories 
-    IOError(String),
-    /// Error related to being unable to parse enum values
-    EnumParseError(String),
+pub struct CopperError<T: CopperErrorKind>
+{
+    kind: T,
+    cause: Option<String>,
 }
 
-// TODO: add better output for the Output
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ProjectConfigError(s) => write!(f, "Configuration error: {}", s),
-            Error::ProjectError(s) => write!(f, "Project error: {}", s),
-            Error::UnitError(s) => write!(f, "Project unit error: {}", s),
-            Error::IOError(s) => write!(f, "IO error: {}", s),
-            Error::EnumParseError(s) => write!(f, "Unable to parse an enum: {}", s),
-        }
+impl<T: CopperErrorKind> CopperError<T> {
+    /// Creates a new CopperError with the specified kind and cause
+    pub fn new(kind: T, cause: impl fmt::Display) -> Self {
+        CopperError { kind, cause: Some(cause.to_string()) }
+    }
+    
+    /// Creates a new CopperError with the specified kind and no cause
+    pub fn no_cause(kind: T) -> Self {
+        CopperError { kind, cause: None }
+    }
+
+    /// Returns a reference to the error message
+    pub fn message(&self) -> String {
+        self.kind.to_string()
+    }
+ 
+    /// Returns a reference to the error kind
+    pub fn kind(&self) -> &T {
+        &self.kind
+    }
+    
+    /// Returns an optional reference to the cause of the error, if any was provided
+    pub fn cause(&self) -> Option<&String> {
+        self.cause.as_ref()
     }
 }
 
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        // TODO: match according to error kind for specific errors
-        match error.kind() {
-            _ => Error::IOError(error.to_string()),
+impl<T: CopperErrorKind> fmt::Display for CopperError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.kind)?;
+        if let Some(cause) = &self.cause {
+            write!(f, "\n\tCause: {}", cause)
+        } else {
+            Ok(())
         }
     }
 }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::error::Error;
+use super::{Error, ErrorKind};
 
 /// Enum representing available project compilers
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,7 +40,7 @@ impl TryFrom<String> for ProjectCompiler {
             Self::GPP_STR | "gpp" => Ok(ProjectCompiler::GPP),
             Self::CLANG_STR => Ok(ProjectCompiler::CLANG),
             Self::MSVC_STR | "cl" => Ok(ProjectCompiler::MSVC),
-            _ => Err(Error::EnumParseError(format!("Unexpected compiler value: {}", value)))
+            _ => Err(Error::new(ErrorKind::InvalidLanguage, format!("'{}' is not a valid compiler value", value)))
         }
     }
 }
