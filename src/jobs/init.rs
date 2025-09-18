@@ -1,5 +1,5 @@
 use std::{env, fs, io, process};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use clap::ArgMatches;
 use crate::project::{CopperProject, ProjectCompiler, ProjectLanguage, UnitType};
 
@@ -9,6 +9,24 @@ use crate::project::{CopperProject, ProjectCompiler, ProjectLanguage, UnitType};
 /// project location and filling in all the required data
 pub fn handle_init(matches: &ArgMatches) {
     let project_location = matches.get_one::<PathBuf>("location").unwrap();
+    
+    if !project_location.is_dir() {
+        eprintln!("Invalid project location '{}' provided", project_location.display());
+        eprintln!("  Cause: The provided project location is not a directory");
+        process::exit(1);
+    }
+    
+    if !project_location.exists() {
+        eprintln!("Invalid project location '{}' provided", project_location.display());
+        eprintln!("  Cause: The provided project location does not exist");
+        process::exit(1);
+    }
+    
+    if let Ok(project) = CopperProject::import(project_location) {
+        eprintln!("Invalid project location '{}' provided", project_location.display());
+        eprintln!("  Cause: A Copper project '{}' already exists at the provided location", project.get_config().name);
+        process::exit(1);
+    }
 
     let project_language = {
         let language_str = matches.get_one::<String>("language").unwrap();
@@ -21,17 +39,25 @@ pub fn handle_init(matches: &ArgMatches) {
     };
 
     let project_name = match matches.get_one::<String>("name") {
-        Some(name) => String::from(name),
+        Some(name) => name.to_string(),
         None => {
-            let directory = if project_location == Path::new("../..") {
-                let current = env::current_dir().unwrap();
-                let name = current.file_name().unwrap();
-                name.to_os_string()
-            } else {
-                let name = project_location.file_name().unwrap();
-                name.to_os_string()
-            };
-            String::from(directory.to_string_lossy())
+            match project_location.file_name() {
+                Some(name) => name.to_string_lossy().to_string(),
+                None => {
+                    let current_dir = env::current_dir().unwrap_or_else(|err| {
+                        eprintln!("Unable to determine current working directory");
+                        eprintln!("  Cause: {}", err);
+                        process::exit(1);
+                    });
+                    
+                    let dir_name = current_dir.file_name().unwrap_or_else(|| {
+                        eprintln!("Unable to determine current working directory name");
+                        process::exit(1);
+                    });
+                    
+                    dir_name.to_string_lossy().to_string()
+                }
+            } 
         }
     };
 
@@ -42,38 +68,36 @@ pub fn handle_init(matches: &ArgMatches) {
         project_compiler
     );
 
-    let generate_example = matches.get_flag("example") && !matches.get_flag("minimal");
-        
     if !fs::exists(project_location).unwrap_or(false) {
         if let Err(err) = fs::create_dir_all(project_location) {
-            println!("Unable to create project directory '{}'", project_location.display());
-            println!("\tCause: {}", err);
+            eprintln!("Unable to create project directory '{}'", project_location.display());
+            eprintln!("  Cause: {}", err);
             process::exit(1);
         }
     }
 
+    let generate_example = matches.get_flag("example") && !matches.get_flag("minimal");
+    
     if generate_example {
         println!("Generating example project structure...");
-        match add_example_config(&project) {
-            Ok(_) => println!("Successfully generated example project structure"),
-            Err(err) => {
-                println!("Unable to generate example project structure");
-                println!("\tCause: {}", err);
-                process::exit(1);
-            }
-        }
-    }
-
-    match project.save(project_location) {
-        Ok(_) => {
-            let cannon_path = project_location.canonicalize().unwrap_or(project_location.to_path_buf());
-            println!("Created a new Copper project at '{}'", cannon_path.display());
-        },
-        Err(err) => {
-            eprintln!("Unable to initialize project: {}", err);
+        
+        add_example_config(&project).unwrap_or_else(|err| {
+            eprintln!("Unable to generate example project structure");
+            eprintln!("  Cause: {}", err);
             process::exit(1);
-        }
+        });
+        
+        println!("Generated example project structure");
     }
+    
+    project.save(project_location).unwrap_or_else(|err| {
+        eprintln!("Unable to save initialized project file");
+        eprintln!("  Cause: {}", err);
+        process::exit(1);
+    });
+
+    let cannon_path = project_location.canonicalize().unwrap_or(project_location.to_path_buf());
+    println!("Successfully created a new Copper project at '{}'", cannon_path.display());
 }
 
 /// Generates an example project configuration. Creates default directories and appends example
