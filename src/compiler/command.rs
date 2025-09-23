@@ -14,11 +14,13 @@ pub struct CompilerCommandFlags {
 
 /// Wrapper for the compiler command executor
 pub struct CompilerCommand {
-    executable_name: String,
-    command_flags: CompilerCommandFlags,
+    /// Name of the compiler executable to use
+    compiler_executable: String,
+    /// Compiler-specific flags
+    compiler_flags: CompilerCommandFlags,
+    /// Relative path to the project root from the process's location to correctly supply
+    /// path-based compiler arguments
     root_relative_path: PathBuf,
-    include_paths: Vec<PathBuf>,
-    additional_args: Vec<String>,
 }
 
 impl CompilerCommand {
@@ -26,30 +28,21 @@ impl CompilerCommand {
         executable_name: String,
         command_flags: CompilerCommandFlags,
         root_relative_path: PathBuf,
-        include_paths: Vec<PathBuf>,
-        additional_args: Vec<String>,
     ) -> Self {
         CompilerCommand {
-            executable_name,
-            command_flags,
+            compiler_executable: executable_name,
+            compiler_flags: command_flags,
             root_relative_path,
-            include_paths,
-            additional_args,
         }
     }
 
-    /// Initiates a new Executor to use
-    pub fn executor<'a>(&self) -> io::Result<CompilerCommandExecutor> {
-        let mut executor = CompilerCommandExecutor::new(
-            &self.executable_name,
-            &self.command_flags,
+    /// Initiates a instance of an Executor to use
+    pub fn executor<'a>(&self) -> CompilerCommandExecutor {
+        CompilerCommandExecutor::new(
+            &self.compiler_executable,
+            &self.compiler_flags,
             &self.root_relative_path,
-        );
-        
-        self.include_paths.iter().try_for_each(|p| executor.add_include_path(p))?;
-        self.additional_args.iter().for_each(|a| executor.add_arg(a));
-        
-        Ok(executor)
+        )
     }
 }
 

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::path::PathBuf;
 use std::{fs, io};
 use std::cell::RefCell;
-use std::ops::Deref;
+use std::io::Read;
 use std::rc::{Rc, Weak};
 use serde::{Deserialize, Serialize};
 use crate::compiler::TargetInformation;
@@ -67,20 +67,45 @@ impl UnitConfig {
     pub fn get_target_information(&self) -> Result<TargetInformation> {
         if let Some(project) = self.get_project() {
             let project_config = project.borrow();
+
             // output and intermediate directories should be passed as relative to where the project is located
-            let output_directory = self.get_output_directory(project_config.deref(), true);
-            let intermediate_directory = self.get_intermediate_directory(project_config.deref(), true);
+            let output_directory = {
+                let directory = self.output_directory.as_ref()
+                    .unwrap_or(match &self.r#type {
+                        UnitType::Binary => &project_config.defaults.binary_directory,
+                        _ => &project_config.defaults.library_directory,
+                    });
 
-            let mut source_file_paths = Vec::new();
-            let unit_path = project_config.root_path.join(&self.source);
-            let extensions = project_config.language.extensions();
-            if let Err(err) = self.get_source_files(&mut source_file_paths, unit_path, &extensions) {
-                return Err(Error::new(ErrorKind::IOError("Unable to get unit's source files".to_string()), err));
-            }
+                project_config.root_path.join(directory)
+            };
 
-            if source_file_paths.is_empty() {
-                return Err(Error::no_cause(ErrorKind::NoSourceFiles));
-            }
+            let intermediate_directory = {
+                let directory = self.intermediate_directory.as_ref()
+                    .unwrap_or(&project_config.defaults.object_directory);
+
+                project_config.root_path.join(directory)
+            };
+
+            let include_paths = project_config.global_include_paths.iter()
+                .chain(self.include_paths.iter())
+                .cloned().collect();
+
+            let compiler_args = Vec::new().into_iter()
+                .chain(project_config.global_additional_compiler_args.as_ref()
+                    .map(|s| s.split_ascii_whitespace()
+                        .map(String::from)
+                        .collect::<Vec<String>>()
+                    )
+                    .unwrap_or_else(Vec::new)
+                )
+                .chain(self.additional_compiler_args.as_ref()
+                    .map(|s| s.split_ascii_whitespace()
+                        .map(String::from)
+                        .collect::<Vec<String>>()
+                    )
+                    .unwrap_or_else(Vec::new)
+                )
+                .collect();
 
             // TODO: move into compiler logic
             if let Err(err) = fs::create_dir_all(&output_directory) {
@@ -91,12 +116,12 @@ impl UnitConfig {
 
             Ok(TargetInformation::new(
                 self.name.clone(),
+                project_config.language.clone(),
                 self.r#type.clone(),
-                source_file_paths,
                 output_directory,
                 intermediate_directory,
-                Some(self.include_paths.clone()),
-                self.additional_compiler_args.clone(),
+                include_paths,
+                compiler_args,
             ))
         } else {
             Err(Error::new(ErrorKind::ProjectUnavailable, "Unit's project reference is invalid"))
@@ -113,41 +138,29 @@ impl UnitConfig {
     pub fn get_project(&self) -> Option<Rc<RefCell<ProjectConfig>>> {
         self.project_reference.upgrade()
     }
-    
-    /// Returns the output directory for the unit, either specified in the unit itself or from the
-    /// project defaults. If `rooted` is true, the path will be absolute (rooted at the project root),
-    /// otherwise it will be relative to the project root
-    fn get_output_directory(&self, project: &ProjectConfig, rooted: bool) -> PathBuf {
-        let directory = self.output_directory.as_ref()
-            .unwrap_or(match &self.r#type {
-                UnitType::Binary => &project.defaults.binary_directory,
-                _ => &project.defaults.library_directory,
-            });
-        
-        if !rooted {
-            return directory.clone();
-        }
-        
-        project.root_path.join(directory)
-    }
-    
-    /// Returns the intermediate directory for the unit, either specified in the unit itself or from the
-    /// project defaults. If `rooted` is true, the path will be absolute (rooted at the project root),
-    /// otherwise it will be relative to the project root
-    fn get_intermediate_directory(&self, project: &ProjectConfig, rooted: bool) -> PathBuf {
-        let directory = self.intermediate_directory.as_ref()
-            .unwrap_or(&project.defaults.object_directory);
-        
-        if !rooted {
-            return directory.clone();
-        }
-        
-        project.root_path.join(directory)
-    }
 
     /// Recursively searches the directory for the source files by extension (according to the
-    /// language) and appends their paths to the vector of source file paths
-    fn get_source_files(&self, source_paths: &mut Vec<PathBuf>, dir_path: PathBuf, extensions: &Vec<OsString>) -> io::Result<()> {
+    /// language) and returns a vector of source file paths
+    pub fn get_source_files(&self) -> Result<Vec<PathBuf>> {
+        if let Some(project) = self.get_project() {
+            let project_config = project.borrow();
+
+            let mut source_file_paths = Vec::new();
+            let unit_path = project_config.root_path.join(&self.source);
+            let extensions = project_config.language.extensions();
+
+            if let Err(err) = self.find_source_files(&mut source_file_paths, unit_path, &extensions) {
+                return Err(Error::new(ErrorKind::IOError("Unable to get unit's source files".to_string()), err));
+            }
+
+            Ok(source_file_paths)
+        } else {
+            Err(Error::new(ErrorKind::ProjectUnavailable, "Unit's project reference is invalid"))
+        }
+    }
+
+    /// Finds source files in the provided directory based on the extensions
+    fn find_source_files(&self, source_paths: &mut Vec<PathBuf>, dir_path: PathBuf, extensions: &Vec<OsString>) -> io::Result<()> {
         for entry in fs::read_dir(&dir_path)? {
             let path = entry?.path();
 
@@ -158,7 +171,7 @@ impl UnitConfig {
                     }
                 }
             } else {
-                self.get_source_files(source_paths, path, extensions)?;
+                self.find_source_files(source_paths, path, extensions)?;
             }
         }
 

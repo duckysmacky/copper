@@ -31,12 +31,11 @@ pub fn handle_build(matches: &ArgMatches) {
         process::exit(1);
     }
     
-    let compiler_options = project.get_compiler_options();
-    let compiler = Compiler::initialize(project_config.compiler.clone(), compiler_options);
+    let compiler = Compiler::initialize(project_config.compiler.clone(), project_config.root_path.clone());
 
     for unit_name in unit_names {
-        let target = match project_config.find_unit(unit_name) {
-            Some(unit) => unit.get_target_information(),
+        let unit = match project_config.find_unit(unit_name) {
+            Some(unit) => unit,
             None => {
                 println!("A unit with name '{}' does not exist in the project", unit_name);
                 println!("Skipping...");
@@ -44,20 +43,23 @@ pub fn handle_build(matches: &ArgMatches) {
             }
         };
         
-        match target {
-            Ok(target) => {
-                println!("Unit '{}' build started", unit_name);
-                compiler.build(target);
-                println!("Unit '{}' build finished", unit_name);
+        let source_files = unit.get_source_files().unwrap_or_else(|err| {
+            eprintln!("An error occurred while trying to get unit '{}' source files: {}", unit_name, err.message());
+            if let Some(cause) = err.cause() {
+                eprintln!("  Cause: {}", cause);
             }
-            Err(err) => {
-                eprintln!("An error occurred while preparing the unit '{}' for build: {}", unit_name, err.message());
-                if let Some(cause) = err.cause() {
-                    eprintln!("  Cause: {}", cause);
-                }
-                process::exit(1);
+            process::exit(1);
+        });
+        
+        let target = unit.get_target_information().unwrap_or_else(|err| {
+            eprintln!("An error occurred while preparing the unit '{}' for build: {}", unit_name, err.message());
+            if let Some(cause) = err.cause() {
+                eprintln!("  Cause: {}", cause);
             }
-        }
+            process::exit(1);
+        });
+        
+        compiler.build(source_files, target);
     }
 
     println!("Copper project build finished");

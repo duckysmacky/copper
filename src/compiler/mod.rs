@@ -12,47 +12,49 @@ mod error;
 /// project files
 pub struct Compiler {
     command: CompilerCommand,
-    compiler: ProjectCompiler,
-    language: ProjectLanguage,
 }
 
 impl Compiler {
     /// Returns a specific compiler instance based on the selected project compiler
-    pub fn initialize(project_compiler: ProjectCompiler, options: CompilerOptions) -> Self {
+    pub fn initialize(project_compiler: ProjectCompiler, root_path: PathBuf) -> Self {
         if !util::check_if_available(&project_compiler) {
             eprintln!("Unsupported compiler specified");
-            eprintln!("  Cause: Compiler not avaliable on the current system");
+            eprintln!("  Cause: Compiler not available on the current system");
             process::exit(1);
         }
         
         let compiler_flags = match project_compiler {
             ProjectCompiler::GCC => gcc::FLAGS,
-            _ => unimplemented!()
+            _ => {
+                eprintln!("Unsupported compiler specified");
+                eprintln!("  Cause: This compiler is not yet implemented");
+                unimplemented!()
+            }
         };
 
         Compiler {
             command: CompilerCommand::new(
                 project_compiler.executable_name(),
                 compiler_flags,
-                options.root_path,
-                options.include_paths.unwrap_or(Vec::new()),
-                options.additional_flags.map_or(Vec::new(), |flags| flags.split_whitespace().map(String::from).collect()), 
+                root_path
             ),
-            compiler: project_compiler,
-            language: options.target_language,
         }
     }
     
-    pub fn build(&self, target: TargetInformation) {
-        let object_files = target.source_files.iter().map(|file| {
+    pub fn build(&self, source_files: Vec<PathBuf>, target: TargetInformation) {
+        println!("Building target '{}'...", target.name);
+        
+        let object_files = source_files.iter().map(|file| {
+            println!("Compiling '{}'...", file.display());
             self.compile(file, &target).unwrap_or_else(|err| {
                 eprintln!("Compilation failed for target '{}'", &target.name);
-                eprintln!("An error accured while trying to compile '{}'", file.display());
+                eprintln!("An error occurred while trying to compile '{}'", file.display());
                 eprintln!("  Cause: {}", err);
                 process::exit(1);
             })
         }).collect();
         
+        println!("Linking object files for target '{}'...", target.name);
         if let Err(err) = self.link_objects(&target, object_files) {
             eprintln!("Linking failed for target '{}'", &target.name);
             eprintln!("  Cause: {}", err);
@@ -65,9 +67,9 @@ impl Compiler {
     /// Compiles target's source file into object files with the same name. Returns a path to the
     /// object file
     fn compile(&self, source_file: &PathBuf, target: &TargetInformation) -> io::Result<PathBuf> {
-        let mut command_executor = self.command.executor()?;
+        let mut command_executor = self.command.executor();
         
-        command_executor.set_language(&self.language);
+        command_executor.set_language(&target.language);
         command_executor.set_compile_flag();
 
         target.include_paths.iter().try_for_each(|p| command_executor.add_include_path(p))?;
@@ -92,12 +94,13 @@ impl Compiler {
             process::exit(exit_code);
         }
 
+        println!("Successfully compiled '{}' to '{}'", source_file.display(), object_file.display());
         Ok(object_file)
     }
 
     /// Links compiled object files to the output file
     fn link_objects(&self, target: &TargetInformation, object_files: Vec<PathBuf>) -> io::Result<()> {
-        let mut command_executor = self.command.executor()?;
+        let mut command_executor = self.command.executor();
         
         object_files.iter().try_for_each(|file| command_executor.add_input_file(file))?;
         
@@ -113,38 +116,8 @@ impl Compiler {
             process::exit(exit_code);
         }
 
+        println!("Successfully linked object files to '{}'", output_file.display());
         Ok(())
-    }
-    
-}
-
-/// Options for configuring compiler's behaviour and supplying persistent attributes for the whole
-/// duration of the process
-pub struct CompilerOptions {
-    /// Relative path to the project root from the process's location to correctly supply
-    /// path-based compiler arguments
-    root_path: PathBuf,
-    /// The main language which is going to be used for compilation
-    target_language: ProjectLanguage,
-    /// Additional paths which are going to be included
-    include_paths: Option<Vec<PathBuf>>,
-    /// Additional flags which are going to be supplied to the compiler
-    additional_flags: Option<String>,
-}
-
-impl CompilerOptions {
-    pub fn new(
-        root_path: PathBuf,
-        target_language: ProjectLanguage,
-        include_paths: Option<Vec<PathBuf>>,
-        additional_flags: Option<String>,
-    ) -> Self {
-        CompilerOptions {
-            root_path,
-            target_language,
-            include_paths,
-            additional_flags,
-        }
     }
 }
 
@@ -152,10 +125,10 @@ impl CompilerOptions {
 pub struct TargetInformation {
     /// Target output name
     name: String,
+    /// The main language which is going to be used for compilation
+    language: ProjectLanguage,
     /// Type of target
     r#type: UnitType,
-    /// Target's source files
-    source_files: Vec<PathBuf>,
     /// The location in which target will be output
     output_directory: PathBuf,
     /// The location for holding target's intermediate object
@@ -169,21 +142,21 @@ pub struct TargetInformation {
 impl TargetInformation {
     pub fn new(
         name: String,
+        language: ProjectLanguage,
         r#type: UnitType,
-        source_files: Vec<PathBuf>,
         output_directory: PathBuf,
         intermediate_directory: PathBuf,
-        include_paths: Option<Vec<PathBuf>>,
-        additional_args: Option<String>,
+        include_paths: Vec<PathBuf>,
+        additional_args: Vec<String>,
     ) -> Self {
         TargetInformation {
             name,
+            language,
             r#type,
-            source_files,
             output_directory,
             intermediate_directory,
-            include_paths: include_paths.unwrap_or(Vec::new()),
-            additional_args: additional_args.map_or(Vec::new(), |a| a.split_whitespace().map(String::from).collect()),
+            include_paths,
+            additional_args,
         }
     }
 }

@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::cell::{Ref, RefCell, RefMut};
 use serde::{Deserialize, Serialize};
-use crate::compiler::CompilerOptions;
 use crate::project::default::ProjectDefaults;
 use super::{ProjectLanguage, ProjectCompiler, UnitConfig, UnitType, PROJECT_FILE_NAME};
 use super::{Error, Result, ErrorKind};
@@ -143,18 +142,6 @@ impl CopperProject {
         config.units.push(new_unit);
     }
     
-    /// Returns global compiler options constructed from the project configuration
-    pub fn get_compiler_options(&self) -> CompilerOptions {
-        let config = self.get_config();
-        
-        CompilerOptions::new(
-            config.root_path.clone(),
-            config.language.clone(),
-            Some(config.global_include_paths.clone()),
-            config.global_additional_compiler_args.clone(),
-        )
-    }
-
     /// Access the underlying project config immutably
     pub fn get_config(&self) -> Ref<ProjectConfig> {
         self.config.borrow()
