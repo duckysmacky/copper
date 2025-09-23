@@ -2,7 +2,6 @@ use std::process::{Command, Output};
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use std::borrow::Cow;
-use std::ffi::OsString;
 use crate::project::ProjectLanguage;
 
 /// Specifies the compiler-specific option flags
@@ -150,5 +149,23 @@ impl<'a> CompilerCommandExecutor<'a> {
         
         println!("Executing: {} {}", cmd_str, args_str);
         self.command.output()
+    }
+}
+
+pub fn print_output(output: &Output, indent: usize) {
+    let indent_str = " ".repeat(indent);
+    
+    if !output.stderr.is_empty() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        for line in stderr.lines() {
+            eprintln!("{}{}", indent_str, line);
+        }
+    }
+    
+    if !output.stdout.is_empty() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            println!("{}{}", indent_str, line);
+        }
     }
 }

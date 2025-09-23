@@ -1,5 +1,4 @@
-use std::{fmt};
-use std::process::Output;
+use std::fmt;
 
 /// A trait for error kinds used in CopperError
 /// 
@@ -56,20 +55,4 @@ impl<T: CopperErrorKind> fmt::Display for CopperError<T> {
             Ok(())
         }
     }
-}
-
-/// Parses the output object and returns a formatted string containing exit code, stdout and stderr
-pub fn parse_output(output: &Output) -> String {
-    let mut message = String::new();
-    message.push_str(format!("{}", output.status).as_str());
-
-    if output.stdout.len() > 0 {
-        message.push_str(format!("\nStdout:\n{}", String::from_utf8_lossy(&output.stdout)).as_str());
-    }
-
-    if output.stderr.len() > 0 {
-        message.push_str(format!("\nStderr:\n{}", String::from_utf8_lossy(&output.stderr)).as_str());
-    }
-
-    message
 }

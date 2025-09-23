@@ -1,33 +1,34 @@
-use std::fmt::{Display, Formatter};
-use std::io;
 use std::process::Output;
-use crate::error::parse_output;
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// GCC-specific error types
-#[derive(Debug)]
-pub enum Error {
-    /// Error related to the compilation of the source files
-    CompileError(Output),
-    /// Error related to the linking of the object files
-    LinkError(Output),
-    /// IO Error
-    IOError(String),
+pub struct CompilerError {
+    exit_code: i32,
+    output: Output,
 }
 
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::CompileError(o) => write!(f, "{}", parse_output(o)),
-            Error::LinkError(o) => write!(f, "{}", parse_output(o)),
-            Error::IOError(s) => write!(f, "IO Error ({})", s),
-        }   
+impl CompilerError {
+    pub fn new(output: Output) -> Self {
+        Self { exit_code: output.status.code().unwrap_or(1), output }
     }
-}
 
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::IOError(err.to_string())
+    pub fn print_output(&self, indent: usize) {
+        let indent_str = " ".repeat(indent);
+        
+        if !self.output.stderr.is_empty() {
+            let stderr = String::from_utf8_lossy(&self.output.stderr);
+            for line in stderr.lines() {
+                eprintln!("{}{}", indent_str, line);
+            }
+        }
+        
+        if !self.output.stdout.is_empty() {
+            let stdout = String::from_utf8_lossy(&self.output.stdout);
+            for line in stdout.lines() {
+                println!("{}{}", indent_str, line);
+            }
+        }
+    }
+
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code
     }
 }

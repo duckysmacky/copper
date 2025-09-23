@@ -1,7 +1,6 @@
-use std::process;
+use std::{io, process};
 use std::path::PathBuf;
 use command::CompilerCommand;
-use error::{Error, Result};
 use crate::project::{ProjectCompiler, ProjectLanguage, UnitType};
 
 mod gcc;
@@ -21,7 +20,8 @@ impl Compiler {
     /// Returns a specific compiler instance based on the selected project compiler
     pub fn initialize(project_compiler: ProjectCompiler, options: CompilerOptions) -> Self {
         if !util::check_if_available(&project_compiler) {
-            eprintln!("Unsupported compiler specified (Not available on the current system)");
+            eprintln!("Unsupported compiler specified");
+            eprintln!("  Cause: Compiler not avaliable on the current system");
             process::exit(1);
         }
         
@@ -44,59 +44,59 @@ impl Compiler {
     }
     
     pub fn build(&self, target: TargetInformation) {
-        let object_paths = self.compile(&target);
+        let object_files = target.source_files.iter().map(|file| {
+            self.compile(file, &target).unwrap_or_else(|err| {
+                eprintln!("Compilation failed for target '{}'", &target.name);
+                eprintln!("An error accured while trying to compile '{}'", file.display());
+                eprintln!("  Cause: {}", err);
+                process::exit(1);
+            })
+        }).collect();
         
-        if let Err(err) = object_paths {
-            eprintln!("Compilation failed for target '{}'", &target.name);
-            eprintln!("{}", err);
-            process::exit(1);
-        }
-        
-        if let Err(err) = self.link_objects(&target, object_paths.unwrap()) {
+        if let Err(err) = self.link_objects(&target, object_files) {
             eprintln!("Linking failed for target '{}'", &target.name);
-            eprintln!("{}", err);
+            eprintln!("  Cause: {}", err);
             process::exit(1);
         }
         
         println!("Build finished successfully for target '{}'", target.name);
     }
 
-    /// Compiles target's source files into object files with the same name
-    fn compile(&self, target: &TargetInformation) -> Result<Vec<PathBuf>> {
-        let mut object_files = Vec::new();
+    /// Compiles target's source file into object files with the same name. Returns a path to the
+    /// object file
+    fn compile(&self, source_file: &PathBuf, target: &TargetInformation) -> io::Result<PathBuf> {
+        let mut command_executor = self.command.executor()?;
         
-        for source_file in &target.source_files {
-            let mut command_executor = self.command.executor()?;
-            
-            command_executor.set_language(&self.language);
-            command_executor.set_compile_flag();
+        command_executor.set_language(&self.language);
+        command_executor.set_compile_flag();
 
-            target.include_paths.iter().try_for_each(|p| command_executor.add_include_path(p))?;
-            target.additional_args.iter().for_each(|arg| command_executor.add_arg(arg));
-            
-            let object_file = {
-                let mut file = target.intermediate_directory.join(&source_file.file_name().unwrap());
-                file.set_extension("o");
-                file
-            };
-            
-            command_executor.set_output_file(&object_file)?;
-            command_executor.add_input_file(&source_file)?;
-            
-            let output = command_executor.execute()?;
+        target.include_paths.iter().try_for_each(|p| command_executor.add_include_path(p))?;
+        target.additional_args.iter().for_each(|arg| command_executor.add_arg(arg));
+        
+        let object_file = {
+            let mut file = target.intermediate_directory.join(&source_file.file_name().unwrap());
+            file.set_extension("o");
+            file
+        };
+        
+        command_executor.set_output_file(&object_file)?;
+        command_executor.add_input_file(&source_file)?;
+        
+        let output = command_executor.execute()?;
 
-            if !output.status.success() {
-                return Err(Error::CompileError(output));
-            }
-
-            object_files.push(object_file);
+        if !output.status.success() {
+            eprintln!("Compilation failed for target '{}'", &target.name);
+            eprintln!("Unable to compile '{}' ({})", source_file.display(), output.status);
+            command::print_output(&output, 4);
+            let exit_code = output.status.code().unwrap_or(1);
+            process::exit(exit_code);
         }
 
-        Ok(object_files)
+        Ok(object_file)
     }
 
     /// Links compiled object files to the output file
-    fn link_objects(&self, target: &TargetInformation, object_files: Vec<PathBuf>) -> Result<()> {
+    fn link_objects(&self, target: &TargetInformation, object_files: Vec<PathBuf>) -> io::Result<()> {
         let mut command_executor = self.command.executor()?;
         
         object_files.iter().try_for_each(|file| command_executor.add_input_file(file))?;
@@ -107,7 +107,10 @@ impl Compiler {
         let output = command_executor.execute()?;
         
         if !output.status.success() {
-            return Err(Error::LinkError(output));
+            eprintln!("Linking failed for target '{}'", &target.name);
+            command::print_output(&output, 4);
+            let exit_code = output.status.code().unwrap_or(1);
+            process::exit(exit_code);
         }
 
         Ok(())
